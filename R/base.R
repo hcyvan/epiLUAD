@@ -12,10 +12,10 @@ printf <- function(format, ...){
   cat(sprintf(format, ...))
 }
 
-loadData <- function(name, directory, ext='csv'){
-  ext.path <- paste(file.path(directory, name),ext,sep = '.')
-  rds.path <- paste(file.path(directory, name),'rds',sep = '.')
-  rds.external.path <- paste(file.path(directory, 'external', name),'rds',sep = '.')
+loadData <- function(name, ext='csv'){
+  ext.path <- paste(file.path(IMAGE_DIR, name),ext,sep = '.')
+  rds.path <- paste(file.path(IMAGE_DIR, name),'rds',sep = '.')
+  rds.external.path <- paste(file.path(IMAGE_DIR, 'external', name),'rds',sep = '.')
   if(file.exists(rds.path)){
     readRDS(rds.path)
   }else if(file.exists(ext.path)) {
@@ -68,7 +68,7 @@ Group <- setRefClass(
 )
 
 getGroups <- function() {
-  data<-loadData('sampleInfo', DATA_DIR)
+  data<-loadData('sampleInfo')
   ret <- list()
   ret$WGBS <- Group$new(filter(data,WGBS=='Yes'))
   ret$RNA <-  Group$new(filter(data,RNA_seq=='Yes'))

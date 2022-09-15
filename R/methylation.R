@@ -12,7 +12,7 @@ source('./R/base.R')
 #----------------------------------------------------------------------------------------------------------------------
 # The mean bisulfite conversion and  CpG depth
 #----------------------------------------------------------------------------------------------------------------------
-wgbsInfo <- loadData('wgbsInfo', './tmp_data')
+wgbsInfo <- loadData('wgbsInfo')
 conversion <- percent2Numeric(wgbsInfo$MCALL_bisulfite_conversion.ratio)
 cpgDepth <- wgbsInfo$MCALL_CG_depth
 printf("The mean bisulfite conversion is: %s", mean(conversion))
@@ -22,7 +22,7 @@ printf("The mean CpG depth is: %s", mean(cpgDepth))
 # Figure S1 a. The mean DNA methylation of all samples				
 #----------------------------------------------------------------------------------------------------------------------
 type<-groups$WGBS$select(c('L0','L1','L2','L3'))
-wgbsInfo <- loadData('wgbsInfo', './tmp_data')
+wgbsInfo <- loadData('wgbsInfo')
 wgbsInfo$MCALL_MeanRatioCG_3X<-percent2Numeric(wgbsInfo$MCALL_MeanRatioCG_3X)
 methy<-wgbsInfo[match(type$SampleName ,wgbsInfo$SampleName),]$MCALL_MeanRatioCG_3X
 saveImage("mean.methy.level.all.sample.pdf",width = 10,height = 4)
@@ -35,7 +35,7 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 1 a. The mean DNA methylation of different groups	
 #----------------------------------------------------------------------------------------------------------------------
-wgbsInfo <- loadData('wgbsInfo', './tmp_data')
+wgbsInfo <- loadData('wgbsInfo')
 wgbsInfo$MCALL_MeanRatioCG_3X<-percent2Numeric(wgbsInfo$MCALL_MeanRatioCG_3X)
 methy<-wgbsInfo[match(type$SampleName ,wgbsInfo$SampleName),]$MCALL_MeanRatioCG_3X
 
@@ -69,7 +69,7 @@ dev.off()
 # Figure S1 b. Unsupervised hierarchical clustering
 #----------------------------------------------------------------------------------------------------------------------
 
-bed <- loadData('sampleMethyLevelDepth10x', './tmp_data')
+bed <- loadData('sampleMethyLevelDepth10x')
 data <- bed[,-1:-3]
 type<-groups$WGBS$select(c('L0','L1','L2','L3'))
 type <- type[match(colnames(data),type$SampleName),]
@@ -91,7 +91,7 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S1 c. principal component analysis
 #----------------------------------------------------------------------------------------------------------------------
-bed <- loadData('sampleMethyLevelDepth10x', './tmp_data')
+bed <- loadData('sampleMethyLevelDepth10x')
 data <- bed[,-1:-3]
 type<-groups$WGBS$select(c('L0','L1','L2','L3'))
 type <- type[match(colnames(data),type$SampleName),]
