@@ -1,0 +1,1 @@
+This directory is used to store larger data files that can be downloaded from the Internet.

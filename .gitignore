@@ -1,2 +1,6 @@
 __pycache__/
 .idea/
+tmp_*/
+.Rproj.user
+*.Rproj
+.Rhistory
