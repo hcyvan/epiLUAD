@@ -1,0 +1,27 @@
+---
+title: "note"
+author: "navych"
+date: "2022/9/22"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '..')
+```
+
+## Generate TSS annotation
+```{r ,warning=FALSE,message=FALSE}
+library(dplyr)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+transc<-transcripts(TxDb.Hsapiens.UCSC.hg38.knownGene)
+tss<-data.frame(chrom=as.vector(transc@seqnames),tss=transc@ranges@start-1,end=transc@ranges@start,strand=transc@strand)
+data<-filter(tss, chrom%in%paste0('chr',c(1:22,'X','Y')))
+write.table(data, '../data/annotation/tss.bed',row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
+```
+
+## 
+```{r}
+system(" python ./script/methTssSignalMatrix.py -t ./data\annotation/tss.bed -i ./data\LAD.group.ratio.bed -u 15000 -d 15000 -o .\tmp_data\tss\matrix.tsv")
+```
