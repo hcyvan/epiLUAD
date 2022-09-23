@@ -1,0 +1,1 @@
+This directory is used to store annotaion files that can be generate by code or download from internet.

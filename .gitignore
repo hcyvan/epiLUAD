@@ -4,3 +4,10 @@ tmp_*/
 .Rproj.user
 *.Rproj
 .Rhistory
+doc/*.html
+
+
+data/annotation/*
+!data/annotation/readme.md
+data/external/*
+!data/external/readme.md
