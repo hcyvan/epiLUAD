@@ -8,6 +8,34 @@ library(factoextra)
 
 source('./R/base.R')
 
+drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
+  d1 <- density(ratio1)
+  d2 <- density(ratio2)
+  dens <- list(a=d1,b=d2)
+  plot(NA, xlim=range(sapply(dens, "[", "x")),
+       ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=2, cex.axis=1.5)
+  mapply(lines, dens, col=1:length(dens))
+  polygon(d1, col=rgb(0, 1, 0,0.5), border=NA)
+  polygon(d2, col=rgb(1, 0, 0,0.5), border=NA)
+  legend(legend.position, legend=c(s1,s2), fill=c("green","red"), bty = "n")
+}
+
+drawDensityAll<-function(r0,r1,r2,r3,legend.position='topleft'){
+  par(mar = c(3,5,1,1))
+  d0<-density(r0)
+  d1<-density(r1)
+  d2<-density(r2)
+  d3<-density(r3)
+  dens <- list(a=d0,b=d1,c=d2,d=d3)
+  plot(NA, xlim=range(sapply(dens, "[", "x")),
+       ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=2, cex.axis=1.5)
+  polygon(d0, border='green3',lwd=1)
+  polygon(d1, border='cyan',lwd=1)
+  polygon(d2, border='orange',lwd=1)
+  polygon(d3, border='red',lwd=1)
+  legend(legend.position, legend=c('L0','L1','L2','L3'), fill=c('green3','cyan','orange','red'), bty = "n",horiz = T)
+}
+
 
 #----------------------------------------------------------------------------------------------------------------------
 # The mean bisulfite conversion and  CpG depth
@@ -84,7 +112,8 @@ dev.off()
 
 saveImage("methylationLevel.cluster.legend.pdf",width = 5,height = 3)
 plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
-legend("topleft", legend =distinct(type,Group,.keep_all = TRUE)$Group, pch=15, pt.cex=3, cex=1.5, bty='n',col = distinct(type,Group,.keep_all = TRUE)$colors,horiz=TRUE)
+legend("topleft", legend =distinct(type,Group,.keep_all = TRUE)$Group,
+       pch=15, pt.cex=3, cex=1.5, bty='n',col = distinct(type,Group,.keep_all = TRUE)$colors,horiz=TRUE)
 dev.off()
 
 
@@ -111,8 +140,65 @@ fviz_pca_ind(res.pca,
              axes=c(1,2),
              pointshape = 19)+
   theme_classic()+
-  theme(plot.title = element_blank(),axis.text=element_text(size=20,colour="black"),axis.title=element_text(size=20),legend.position = "none")
+  theme(plot.title = element_blank(),
+        axis.text=element_text(size=20,colour="black"),axis.title=element_text(size=20),legend.position = "none")
 dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 1 b. principal component analysis
+#----------------------------------------------------------------------------------------------------------------------
+groupMethyLevelDepth3xAllLine1<-loadData('groupMethyLevelDepth3xAllLine1')
+line<-removeNegativeOne(groupMethyLevelDepth3xAllLine1)
+saveImage("methyLevel.density.line1.pdf",width = 4,height = 3.5)
+layout(1:3)
+par(mar = c(3,5,1,1))
+drawDensity(line$L0, line$L1, "L0", "L1")
+drawDensity(line$L0, line$L2, "L0", "L2")
+drawDensity(line$L0, line$L3, "L0", "L3")
+dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S2 a. principal component analysis
+#----------------------------------------------------------------------------------------------------------------------
+groupMethyLevelDepth3xAllLine1<-loadData('groupMethyLevelDepth3xAllLine1')
+line<-removeNegativeOne(groupMethyLevelDepth3xAllLine1)
+saveImage("methyLevel.density.all.line1.pdf",width = 8,height = 3)
+drawDensityAll(line$L0,line$L1,line$L2,line$L3,'topleft')
+dev.off()
+
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S2 a. principal component analysis
+#----------------------------------------------------------------------------------------------------------------------
+saveImage("methyLevel.density.cgi.pdf",width = 4,height = 3.5)
+layout(1:3)
+par(mar = c(3,5,1,1))
+drawDensity(cgi$L0, cgi$L1, "L0", "L1",'topright')
+drawDensity(cgi$L0, cgi$L2, "L0", "L2",'topright')
+drawDensity(cgi$L0, cgi$L3, "L0", "L3",'topright')
+dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S2 a. principal component analysis
+#----------------------------------------------------------------------------------------------------------------------
+groupMethyLevelDepth3xAllCgi<-loadData('groupMethyLevelDepth3xAllCgi')
+cgi<-removeNegativeOne(groupMethyLevelDepth3xAllCgi)
+saveImage("methyLevel.density.all.cgi.pdf",width = 8,height = 3)
+drawDensityAll(cgi$L0,cgi$L1,cgi$L2,cgi$L3,'topright')
+dev.off()
+
+###################################################################
+
+library(dplyr)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+transc<-transcripts(TxDb.Hsapiens.UCSC.hg38.knownGene)
+tss<-data.frame(chrom=as.vector(transc@seqnames),tss=transc@ranges@start-1,end=transc@ranges@start,strand=transc@strand)
+data<-filter(tss, chrom%in%paste0('chr',c(1:22,'X','Y')))
+
+
+
+
+
 
 
 

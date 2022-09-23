@@ -12,10 +12,14 @@ printf <- function(format, ...){
   cat(sprintf(format, ...))
 }
 
+removeNegativeOne <- function(m){
+  m[rowSums(m[,4:ncol(m)]==-1)==0,]
+}
+
 loadData <- function(name, ext='csv'){
-  ext.path <- paste(file.path(IMAGE_DIR, name),ext,sep = '.')
-  rds.path <- paste(file.path(IMAGE_DIR, name),'rds',sep = '.')
-  rds.external.path <- paste(file.path(IMAGE_DIR, 'external', name),'rds',sep = '.')
+  ext.path <- paste(file.path(DATA_DIR, name),ext,sep = '.')
+  rds.path <- paste(file.path(DATA_DIR, name),'rds',sep = '.')
+  rds.external.path <- paste(file.path(DATA_DIR, 'external', name),'rds',sep = '.')
   if(file.exists(rds.path)){
     readRDS(rds.path)
   }else if(file.exists(ext.path)) {
@@ -23,12 +27,12 @@ loadData <- function(name, ext='csv'){
       data<-read.csv(ext.path)
       saveRDS(data, rds.path)
       data
-    }else{
+    } else {
       stop(sprintf("The file format <%s> is not supported", ext)); 
     }
-  }else if(file.exists(rds.external.path)){
+  } else if(file.exists(rds.external.path)){
     readRDS(rds.external.path)
-  }else{
+  } else{
     stop(sprintf("File not exist: %s and %s", rds.path, ext.path))
   }
 }
