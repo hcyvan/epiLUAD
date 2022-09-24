@@ -64,7 +64,7 @@ for i in range(len(tss_file)):
     top_ratio += mm
 np.seterr(invalid='ignore')
 ratio_matrix = top_ratio / top_count
-matrix = pd.DataFrame(np.round_(ratio_matrix, 2), columns=ratio.columns[3:])
+matrix = pd.DataFrame(ratio_matrix, columns=ratio.columns[3:])
 matrix['tss'] = list(range(-UP, DOWN + 1))
 matrix.set_index('tss', inplace=True)
 
