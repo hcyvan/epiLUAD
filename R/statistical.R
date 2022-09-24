@@ -37,3 +37,22 @@ car.data<-data.frame(data$Group, data$Sex)
 target <- table(car.data)
 chisq.test(target)
 print(target)
+
+
+#----------------------------------------------------------------------------------------------------------------------
+# Table S4. Hyper-DMCs and Hypo-DMCs of different group in LUAD				
+#----------------------------------------------------------------------------------------------------------------------
+dmcL0vsL1<-loadDataBed('dmcL0vsL1')
+dmcL0vsL2<-loadDataBed('dmcL0vsL2')
+dmcL0vsL3<-loadDataBed('dmcL0vsL3')
+sum(table(dmcL0vsL1$class))
+sum(table(dmcL0vsL2$class))
+sum(table(dmcL0vsL3$class))
+L1.vs.L0<-data.frame(group="L1.vs.L0", class=dmcL0vsL1$class)
+L2.vs.L0<-data.frame(group="L2.vs.L0", class=dmcL0vsL2$class)
+L3.vs.L0<-data.frame(group="L3.vs.L0", class=dmcL0vsL3$class)
+data<-Reduce(rbind, list(L1.vs.L0,L2.vs.L0,L3.vs.L0))
+target<-table(data)
+chisq.test(target)
+print(target)
+
