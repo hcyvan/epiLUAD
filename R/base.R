@@ -16,7 +16,7 @@ removeNegativeOne <- function(m){
   m[rowSums(m[,4:ncol(m)]==-1)==0,]
 }
 
-loadData <- function(name, ext='csv'){
+loadData <- function(name, ext="csv"){
   ext.path <- paste(file.path(DATA_DIR, name),ext,sep = '.')
   rds.path <- paste(file.path(DATA_DIR, name),'rds',sep = '.')
   rds.external.path <- paste(file.path(DATA_DIR, 'external', name),'rds',sep = '.')
@@ -27,6 +27,10 @@ loadData <- function(name, ext='csv'){
       data<-read.csv(ext.path)
       saveRDS(data, rds.path)
       data
+    }else if(ext=='bed'){
+      data<-read.csv(ext.path,sep = '\t',check.names = FALSE)
+      saveRDS(data, rds.path)
+      data
     } else {
       stop(sprintf("The file format <%s> is not supported", ext)); 
     }
@@ -35,6 +39,10 @@ loadData <- function(name, ext='csv'){
   } else{
     stop(sprintf("File not exist: %s and %s", rds.path, ext.path))
   }
+}
+
+loadDataBed<-function(name){
+  loadData(name, 'bed')
 }
 
 #############################################################################################

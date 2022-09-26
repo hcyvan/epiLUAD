@@ -187,19 +187,120 @@ saveImage("methyLevel.density.all.cgi.pdf",width = 8,height = 3)
 drawDensityAll(cgi$L0,cgi$L1,cgi$L2,cgi$L3,'topright')
 dev.off()
 
-###################################################################
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 1 e. The DMC density distribute
+#----------------------------------------------------------------------------------------------------------------------
+draw.scatter <- function(dmc,xlab,ylab){
+  percent <- function(x, digits = 2, format = "f", ...) {
+    paste0(formatC(x * 1000, format = format, digits = digits, ...), "‰")
+  }
+  data<-data.frame(x=dmc$nominalRatio_0, y=dmc$nominalRatio_1)
+  palette <- colorRampPalette(c("blue", "yellow", "red"))
+  smoothScatter(data,colramp = palette,xlab=xlab,ylab=ylab,cex.lab=2, cex.axis=1.5)
+  total<-29401360
+  hyper<-table(dmc$class)[1]
+  hypo<-table(dmc$class)[2]
+  text(x = 0.15, y = 0.85, labels = percent(hyper/total),cex=1.5)
+  text(x = 0.85, y = 0.15, labels = percent(hypo/total),cex=1.5)
+}
 
-library(dplyr)
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-transc<-transcripts(TxDb.Hsapiens.UCSC.hg38.knownGene)
-tss<-data.frame(chrom=as.vector(transc@seqnames),tss=transc@ranges@start-1,end=transc@ranges@start,strand=transc@strand)
-data<-filter(tss, chrom%in%paste0('chr',c(1:22,'X','Y')))
 
+dmcL0vsL1<-loadDataBed('dmcL0vsL1')
+dmcL0vsL2<-loadDataBed('dmcL0vsL2')
+dmcL0vsL3<-loadDataBed('dmcL0vsL3')
 
+saveImage("dmc.L0.vs.L1.pdf",width = 4.5,height = 4)
+draw.scatter(dmcL0vsL1, 'L0','L1')
+dev.off()
+saveImage("dmc.L0.vs.L2.pdf",width = 4.5,height = 4)
+draw.scatter(dmcL0vsL2, 'L0','L2')
+dev.off()
+saveImage("dmc.L0.vs.L3.pdf",width = 4.5,height = 4)
+draw.scatter(dmcL0vsL3, 'L0','L3')
+dev.off()
 
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 1 d. Methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
+#----------------------------------------------------------------------------------------------------------------------
+smooth2 <- function(hw=51) {
+  function(arr){
+    for(i in 1:length(arr)){
+      left<-i-hw
+      if(left < 1){
+        left<-1
+      }
+      right<-i+hw
+      if(right > length(arr)){
+        right<-length(arr)
+      }
+      
+      arr[i]<-mean(arr[left:right])
+    }
+    arr
+  }
+}
 
+plot.group.methy.profile<- function(UP,DWON,ylab="Methylation Level",cex=1.5,horiz=FALSE){
+  x<-seq(UP, DWON)
+  signalMatrixGroup<-loadDataBed('signalMatrixGroup')
+  mmData<-signalMatrixGroup[,-1]
+  mm<-mmData[(15001+UP):(15001+DWON),]
+  mm<-as.data.frame(apply(mm,2,smooth2(51)))
+  mm<-as.data.frame(mm)
+  par(mar = c(5,5,1,1))
+  plot(NA, xlim=c(UP, DWON), xlab="bp to TSS",ylab=ylab,cex.lab=2, cex.axis=1.5,ylim=c(min(mm),max(mm)))
+  lines(x,mm[["L0"]],col=alpha("green3", 0.5))
+  lines(x,mm[["L1"]],col=alpha("cyan", 0.5))
+  lines(x,mm[["L2"]],col=alpha("orange", 0.5))
+  lines(x,mm[["L3"]],col=alpha("red", 0.5))
+  legend("bottomleft",legend=c("L0","L1","L2","L3"),fill=c("green3","cyan","orange","red"),bty = "n",cex=cex,horiz = horiz)
+}
+saveImage("methyLevel.profile.pdf",width = 6,height = 4)
+plot.group.methy.profile(-5000, 5000)
+dev.off()
 
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S1 c. 
+#----------------------------------------------------------------------------------------------------------------------
+plot.sample.methy.profile <- function(UP,DWON){
+  signalMatrixSample<-loadDataBed('signalMatrixSample')
+  mmData<-signalMatrixSample[,-1]
+  type<-groups$WGBS$select(c('L0','L1','L2','L3'))
+  samples<-colnames(mmData)
+  colors<-type$colors[match(samples,type$SampleName)]
+  ylab="Methylation Level"
+  x<-seq(UP, DWON)
+  mm<-mmData[(15001+UP):(15001+DWON),]
+  par(mar = c(5,5,1,1))
+  plot(NA, xlim=c(UP, DWON), ylim=c(min(mm),max(mm)), xlab="bp to TSS",ylab=ylab,cex.lab=2, cex.axis=1.5)
+  
+  for(i in 1:length(samples)){
+    lines(x,mm[[samples[i]]],col=alpha(colors[i],0.3))
+  }
+  legend("bottomleft",legend=c("L0","L1","L2","L3"),fill=c("green3","cyan","orange","red"),bty = "n",cex=1,horiz = T)
+}
+saveImage("methyLevel.profile.1.pdf",width = 5,height = 5)
+plot.sample.methy.profile(-5000,-4900)
+dev.off()
+saveImage("methyLevel.profile.2.pdf",width = 5,height = 5)
+plot.sample.methy.profile(-1000,-0)
+dev.off()
+saveImage("methyLevel.profile.3.pdf",width = 5,height = 5)
+plot.sample.methy.profile(4900,5000)
+dev.off()
 
+UP<--5000
+DWON<-5000
+x<-seq(UP, DWON)
+mm<-mmData[(15001+UP):(15001+DWON),]
+SD<-apply(mm,1, function(x){
+  sd(x)
+})
+SD<--log10(SD)
+saveImage("methyLevel.profile.sd.pdf",width = 7,height = 2.5)
+par(mar = c(5,5,1,1))
+plot(UP:DWON,SD,pch=16,cex=0.1,xlab="bp to TSS",ylab="-Log10(SD)",cex.lab=1, cex.axis=1)
+dev.off()
 
 
 

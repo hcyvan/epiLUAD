@@ -21,7 +21,8 @@ data<-filter(tss, chrom%in%paste0('chr',c(1:22,'X','Y')))
 write.table(data, '../data/annotation/tss.bed',row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
 ```
 
-## 
+## Generate TSS signal Matrix
 ```{r}
-system(" python ./script/methTssSignalMatrix.py -t ./data\annotation/tss.bed -i ./data\LAD.group.ratio.bed -u 15000 -d 15000 -o .\tmp_data\tss\matrix.tsv")
+system(" python ./script/methTssSignalMatrix.py -t ./data/annotation/tss.bed -i ./data/LAD.group.ratio.bed -u 15000 -d 15000 -o ./tmp_data/tss/signalMatrixGroup.tsv")
 ```
+
