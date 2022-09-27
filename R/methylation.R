@@ -260,7 +260,7 @@ plot.group.methy.profile(-5000, 5000)
 dev.off()
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S1 c. 
+# Figure S1 c. The variation of methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
 #----------------------------------------------------------------------------------------------------------------------
 plot.sample.methy.profile <- function(UP,DWON){
   signalMatrixSample<-loadDataBed('signalMatrixSample')

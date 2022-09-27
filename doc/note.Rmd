@@ -26,3 +26,8 @@ write.table(data, '../data/annotation/tss.bed',row.names = FALSE,sep = '\t',quot
 system(" python ./script/methTssSignalMatrix.py -t ./data/annotation/tss.bed -i ./data/LAD.group.ratio.bed -u 15000 -d 15000 -o ./tmp_data/tss/signalMatrixGroup.tsv")
 ```
 
+## Find SRDMRs from SRDMCs
+
+```{r}
+# write.table(srdmc, './tmp_data/srdmc.bed',row.names = FALSE,sep = '\t',quote = FALSE)
+```
