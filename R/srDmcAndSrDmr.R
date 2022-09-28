@@ -4,6 +4,10 @@ library(ggplot2)
 library(ggalluvial)
 library(ComplexHeatmap)
 library(circlize)
+library(ChIPseeker)
+# library(patchwork)
+library(GenomicRanges)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
 
 source('./R/base.R')
@@ -11,7 +15,7 @@ source('./R/base.R')
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2 a(left). xxxxxxxxxxxxxxxxxxxxxxxxx			
+# Figure 2 a(left). Obtain SR-DMCs from DMCs of L1-L3 groups
 #----------------------------------------------------------------------------------------------------------------------
 extractDmc <- function(dmcTag,group) {
   dmc<-loadDataBed(dmcTag)
@@ -25,19 +29,14 @@ dmcL0vsL1<-extractDmc('dmcL0vsL1','L1')
 dmcL0vsL2<-extractDmc('dmcL0vsL2','L2')
 dmcL0vsL3<-extractDmc('dmcL0vsL3','L3')
 
-
 lData<-Reduce(rbind,list(dmcL0vsL1,dmcL0vsL2,dmcL0vsL3))
 srdmc<-dcast(lData,chrom + start+ end ~ group,value.var = 'class')
 srdmc[,4:6][is.na(srdmc[,4:6])] <- "NC"
-
-
 df<-srdmc%>%count(L1,L2,L3)
 df<-(df%>%arrange(desc(n)))
 df$L1 = factor(df$L1,levels = c('Hyper','NC','Hypo'))
 df$L2 = factor(df$L2,levels = c('Hyper','NC','Hypo'))
 df$L3 = factor(df$L3,levels = c('Hyper','NC','Hypo'))
-
-
 df$fill<-as.factor(1:23)
 df$col<-rep('gray', 23)
 df$col[1]<-'green3'
@@ -50,17 +49,26 @@ df$col[13] <- 'cyan1'
 df$col[14] <- 'cyan1'
 df=df[1:14,]
 
-
 saveImage("SRDMC.alluvium.pdf",width = 4,height = 9)
-ggplot(df,
-       aes(y = n, axis1 = L1, axis2 = L2, axis3=L3)) +
+ggplot(df, aes(y = n, axis1 = L1, axis2 = L2, axis3=L3)) +
   geom_alluvium(aes(fill = fill)) +
   geom_stratum(width = 1/6, fill = "white") +
   geom_text(stat = "stratum", aes(label = after_stat(stratum)),angle=90,size=5)+
   coord_cartesian(clip = 'off')+
   scale_fill_manual(values=df$col)+
-  theme_void()+
-  guides(fill = F)
+  theme_bw()+
+  theme(
+    axis.title.y=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.text.x = element_text(size=20,vjust = 5,colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank()
+  )+
+  guides(fill = F)+
+  scale_x_continuous(breaks = 1:3, labels = c("L1", "L2", "L3"),position = 'top')
 dev.off()
 
 colors <- c('cyan1','darkorchid1','green3','red')
@@ -89,7 +97,7 @@ saveRDS(SRDMC, file.path(DATA_DIR, 'SRDMC.rds'))
 #------------------------- Prepare SRDMC (stage related DMCs) ----------------------------------------------->>>
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2 a(right). xxxxxxxxxxxxxxxxxxxxxxxxx			
+# Figure 2 a(right). The heatmap of SR-DMCs			
 #----------------------------------------------------------------------------------------------------------------------
 sampleMethyLevelDepth3xSRDMC<-loadData('sampleMethyLevelDepth3xSRDMC')
 sampleMethyLevelDepth3xSRDMC<-removeNegativeOne(sampleMethyLevelDepth3xSRDMC)
@@ -155,8 +163,8 @@ ht<-Heatmap(mm,
             top_annotation = top_ha,
             left_annotation = left_ha,
             heatmap_legend_param = list(
-              title = "Scaled DNA Methylation",
-              legend_height = unit(4, "cm"),
+              title = "Scaled DNA Methylation Levels",
+              legend_height = unit(6, "cm"),
               at = c(-2,0,2),
               labels = c("-2",'0', "2"),
               title_position = "lefttop-rot"),
@@ -166,13 +174,65 @@ draw(ht,heatmap_legend_side='right')
 dev.off()
 
 
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S3 a. The distribution of SR-DMCs in the genome
+#----------------------------------------------------------------------------------------------------------------------
+SRDMC<-loadData('SRDMC')
+SRDMC <- GRanges(SRDMC)
+SRDMCList<-split(SRDMC, SRDMC$class)
+options(ChIPseeker.ignore_1st_exon = T)
+options(ChIPseeker.ignore_1st_intron = T)
+options(ChIPseeker.ignore_downstream = T)
+options(ChIPseeker.ignore_promoter_subcategory = T)
+peakAnnoList<- lapply(SRDMCList, annotatePeak, tssRegion=c(-5000, 3000),TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene)
+saveImage("SRDMC.distribution.Early-Hypo-DMC.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Early-Hypo-DMC`)
+dev.off()
+saveImage("SRDMC.distribution.Early-Hyper-DMC.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Early-Hyper-DMC`)
+dev.off()
+saveImage("SRDMC.distribution.Late-Hypo-DMC.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Late-Hypo-DMC`)
+dev.off()
+saveImage("SRDMC.distribution.Late-Hyper-DMC.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Late-Hyper-DMC`)
+dev.off()
+
+saveImage("SRDMC.distribution.distToTss.pdf",width = 7,height = 2)
+plotDistToTSS(peakAnnoList,title ="", ylab = "Percentage of SR-DMC (%)")
+dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S3 b. The distribution of SR-DMRs in the genome
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-loadData('SRDMR')
+SRDMR <- GRanges(SRDMR)
+SRDMRList<-split(SRDMR, SRDMR$class)
+options(ChIPseeker.ignore_1st_exon = T)
+options(ChIPseeker.ignore_1st_intron = T)
+options(ChIPseeker.ignore_downstream = T)
+options(ChIPseeker.ignore_promoter_subcategory = T)
+peakAnnoList<- lapply(SRDMRList, annotatePeak, tssRegion=c(-5000, 3000),TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene)
+saveImage("SRDMR.distribution.Early-Hypo-DMR.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Early-Hypo-DMR`)
+dev.off()
+saveImage("SRDMR.distribution.Early-Hyper-DMR.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Early-Hyper-DMR`)
+dev.off()
+saveImage("SRDMR.distribution.Late-Hypo-DMR.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Late-Hypo-DMR`)
+dev.off()
+saveImage("SRDMR.distribution.Late-Hyper-DMR.pdf",width = 5,height = 3)
+plotAnnoPie(peakAnnoList$`Late-Hyper-DMR`)
+dev.off()
+
+saveImage("SRDMR.distribution.distToTss.pdf",width = 7,height = 2)
+plotDistToTSS(peakAnnoList,title ="", ylab = "Percentage of SR-DMR (%)")
+dev.off()
 
 
 
-
-
-
-
+##############################################################
 
 
 
