@@ -248,7 +248,7 @@ plot.group.methy.profile<- function(UP,DWON,ylab="Methylation Level",cex=1.5,hor
   mm<-as.data.frame(apply(mm,2,smooth2(51)))
   mm<-as.data.frame(mm)
   par(mar = c(5,5,1,1))
-  plot(NA, xlim=c(UP, DWON), xlab="bp to TSS",ylab=ylab,cex.lab=2, cex.axis=1.5,ylim=c(min(mm),max(mm)))
+  plot(NA, xlim=c(UP, DWON), xlab="Distance to TSS (bp)",ylab=ylab,cex.lab=2, cex.axis=1.5,ylim=c(min(mm),max(mm)))
   lines(x,mm[["L0"]],col=alpha("green3", 0.5))
   lines(x,mm[["L1"]],col=alpha("cyan", 0.5))
   lines(x,mm[["L2"]],col=alpha("orange", 0.5))
