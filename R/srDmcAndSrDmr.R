@@ -231,7 +231,34 @@ dev.off()
 
 
 
-##############################################################
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 2 b. Density plot of SR-DMRs with respect to distance from the TSS
+#----------------------------------------------------------------------------------------------------------------------
+limit <- 5000
+
+
+SRDMR<-loadData('SRDMR')
+SRDMR <- GRanges(SRDMR)
+SRDMRList<-split(SRDMR, SRDMR$class)
+peakAnnoList<- lapply(SRDMRList, annotatePeak, tssRegion=c(-5000, 3000),TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene)
+
+dens<-lapply(peakAnnoList, function(x){
+  density(x@anno$distanceToTSS[abs(x@anno$distanceToTSS)<limit])
+})
+
+saveImage("SRDMR.density.distToTss.5000.pdf",width = 6,height = 5)
+par(mar = c(5,5,1,2))
+xl<-range(sapply(dens, "[", "x"))
+yl<-range(sapply(dens, "[", "y"))
+plot(NA, xlim=xl, ylim=yl,xlab="Distance to TSS (bp)",ylab="Density",cex.lab=2, cex.axis=1.5, bty = "n")
+lines(dens$`Early-Hypo-DMR`,lwd=2,col='darkorchid1')
+lines(dens$`Early-Hyper-DMR`,lwd=2,col='cyan1')
+lines(dens$`Late-Hypo-DMR`,lwd=2,col='green3')
+lines(dens$`Late-Hyper-DMR`,lwd=2,col='red')
+legend("topright", legend=c("Early-Hypo-DMR",'Early-Hyper-DMR','Late-Hypo-DMR','Late-Hyper-DMR'), fill=c('cyan1','darkorchid1','green3','red'), bty = "n")
+dev.off()
+
 
 
 ###############################################################
