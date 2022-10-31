@@ -33,4 +33,5 @@ source('./R/base.R')
 SRDMC<-loadData('SRDMC')
 write.table(SRDMC, './data/intermediate/srdmc.bed',row.names = FALSE,sep = '\t',quote = FALSE)
 system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.bed -o ./data/intermediate/srdmr.bed")
+
 ```

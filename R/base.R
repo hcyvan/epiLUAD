@@ -1,7 +1,7 @@
 library(dplyr)
 
-DATA_DIR='./tmp_data'
-IMAGE_DIR='./tmp_image'
+DATA_DIR<-'./tmp_data'
+IMAGE_DIR<-'./tmp_image'
 
 ########################################### helper function ###########################################
 percent2Numeric <- function(x){
