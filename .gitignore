@@ -11,7 +11,5 @@ data/annotation/*
 !data/annotation/readme.md
 data/external/*
 !data/external/readme.md
-data/intermediate/*
-!data/intermediate/readme.md
 
 config.yaml

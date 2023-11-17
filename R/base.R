@@ -12,10 +12,12 @@ if (file.exists(configPath)) {
   stop('please add configure file [config.yaml] to this project root directory')
 }
 
-config <- yaml::read_yaml(configPath)
+CONFIG <- yaml::read_yaml(configPath)
+CONFIG['dataAnnotation']<-'./data/annotation'
+CONFIG['dataIntermediate']<-'./data/intermediate'
 
-DATA_DIR <- config$dataDir
-IMAGE_DIR <- config$imageDir
+DATA_DIR <- CONFIG$dataDir
+IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
 percent2Numeric <- function(x){
   as.numeric(substr(x,0,nchar(x)-1))/100
@@ -29,19 +31,23 @@ removeNegativeOne <- function(m){
   m[rowSums(m[,4:ncol(m)]==-1)==0,]
 }
 
-loadData <- function(name, ext="csv"){
+loadData <- function(name, ext="csv", header=FALSE, force.refresh=FALSE){
   ext.path <- paste(file.path(DATA_DIR, name),ext,sep = '.')
   rds.path <- paste(file.path(DATA_DIR, name),'rds',sep = '.')
   rds.external.path <- paste(file.path(DATA_DIR, 'external', name),'rds',sep = '.')
-  if(file.exists(rds.path)){
+  if(file.exists(rds.path) && !force.refresh){
     readRDS(rds.path)
   }else if(file.exists(ext.path)) {
     if(ext=='csv'){
       data<-read.csv(ext.path)
       saveRDS(data, rds.path)
       data
-    }else if(ext=='bed'){
+    }else if(ext=='tsv'){
       data<-read.csv(ext.path,sep = '\t',check.names = FALSE)
+      saveRDS(data, rds.path)
+      data
+    }else if(ext=='bed'){
+      data<-read.csv(ext.path,sep = '\t',check.names = FALSE, header=header)
       saveRDS(data, rds.path)
       data
     } else {
