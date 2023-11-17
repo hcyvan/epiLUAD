@@ -1,5 +1,6 @@
 # epiLUAD
-
+## How to run?
++ config.default.yaml to config.yaml, and set variables
 ## script
 
 **dmc2dmr.py**

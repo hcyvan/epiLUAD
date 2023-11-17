@@ -1,8 +1,21 @@
 library(dplyr)
+library(yaml)
 
-DATA_DIR<-'./tmp_data'
-IMAGE_DIR<-'./tmp_image'
 
+configDefaultPath <- './config.default.yaml'
+configPath <- './config.yaml'
+if (file.exists(configPath)) {
+  
+} else if(file.exists(configDefaultPath)) {
+  configPath <- configDefaultPath
+} else {
+  stop('please add configure file [config.yaml] to this project root directory')
+}
+
+config <- yaml::read_yaml(configPath)
+
+DATA_DIR <- config$dataDir
+IMAGE_DIR <- config$imageDir
 ########################################### helper function ###########################################
 percent2Numeric <- function(x){
   as.numeric(substr(x,0,nchar(x)-1))/100
