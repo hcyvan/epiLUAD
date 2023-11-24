@@ -12,7 +12,7 @@ m<-do.call(rbind,lapply(genomicRegionMethyLevel, function(x){
   x<-x[,4:ncol(x)]
   colMeans(x,na.rm=TRUE)
 }))
-rownames(m)<-c('CpG Islands', 'CpG Shelves', 'CpG Shores', 'Exons', 'Intergenic', 'Intron', 'Promoter 1K', 'Promoter 5k', 'TSS', "3'UTR", "5'UTR")
+rownames(m)<-c('CpG Islands', 'CpG Sea','CpG Shelves', 'CpG Shores', 'Exons', 'Intergenic', 'Intron', 'Promoter 1K', 'Promoter 5k', 'TSS', "3'UTR", "5'UTR")
 samples<-groups$WGBS$selectBySample(colnames(m))
 
 color.map<-groups$WGBS$getColorMapVec()
@@ -22,7 +22,7 @@ column_annotation <-HeatmapAnnotation(
   show_annotation_name =FALSE,
   annotation_name_side='left'
 )
-saveImage2("genomeRegion.heatmap.pdf",width = 16,height = 2.5)
+saveImage2("genomicRegion.heatmap.pdf",width = 16,height = 2.5)
 Heatmap(m,
         cluster_rows=TRUE,
         cluster_columns = FALSE,
