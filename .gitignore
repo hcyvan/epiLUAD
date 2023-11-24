@@ -11,5 +11,12 @@ data/annotation/*
 !data/annotation/readme.md
 data/external/*
 !data/external/readme.md
+data/result/*
+!data/result/readme.md
 
 config.yaml
+to.remove.when.public.R
+.RDataTmp
+
+
+

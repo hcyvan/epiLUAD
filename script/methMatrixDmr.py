@@ -32,7 +32,7 @@ while bed.startswith('#'):
     bed = bed_f.readline()
 bed = bed.strip().split('\t')
 
-headers_new = ['chrom', 'start', 'end', 'class']
+headers_new = ['chrom', 'start', 'end']
 headers_new.extend(headers[3:])
 out.write('\t'.join(headers_new) + '\n')
 out.flush()
@@ -49,7 +49,7 @@ for line in gzip_f:
     if line[0] != bed[0] or int(line[1]) < int(bed[1]) or int(line[1]) > int(bed[2]) - 1:
         if top.shape[0] > 0:
             mean_ratio = np.round(np.nanmean(top, axis=0), 3).astype('str')
-            dmr_line = bed[0:4]
+            dmr_line = bed[0:3]
             dmr_line.extend(mean_ratio)
             out.write('\t'.join(dmr_line) + '\n')
             out.flush()

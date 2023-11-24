@@ -1,5 +1,6 @@
 library(dplyr)
 library(yaml)
+library(tools)
 
 
 configDefaultPath <- './config.default.yaml'
@@ -15,6 +16,8 @@ if (file.exists(configPath)) {
 CONFIG <- yaml::read_yaml(configPath)
 CONFIG['dataAnnotation']<-'./data/annotation'
 CONFIG['dataIntermediate']<-'./data/intermediate'
+CONFIG['dataExternal']<-'./data/external'
+CONFIG['dataResult']<-'./data/result'
 
 DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
@@ -64,36 +67,78 @@ loadDataBed<-function(name){
   loadData(name, 'bed')
 }
 
-#############################################################################################
+#' load data function
+#' 
+#' This function while load data and generate rds cache.
+#' 
+#' @param filename The file path of input data
+#' @param file.format The file format. If not set, it will be automatically set based on the extension.
+#' @param force.refresh Set TRUE will over write the rds cache
+#' @param header see read.csv
+#'
+loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE) {
+  filename.rds<-paste0(file_path_sans_ext(filename),'.rds')
+  if (is.null(file.format)){
+    file.format=file_ext(filename)
+  }
+  
+  if (file.exists(filename.rds) && !force.refresh) {
+    readRDS(filename.rds)
+  } else {
+    if(file.format=='bed'){
+      data<-read.csv(filename,sep = '\t',check.names = FALSE, header=header)
+      saveRDS(data, filename.rds)
+      data
+    } else if(file.format=='csv'){
+      data<-read.csv(filename)
+      saveRDS(data, filename.rds)
+      data
+    }
+  }
+}
+
+############################################################################################
 chromFactorLevel<-c('chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14',
      'chr15','chr16','chr17','chr18','chr19','chr20','chr21','chr22','chrX','chrY')
+groupFactorLevel<-c('CTL', 'AIS', 'MIA', 'IAC')
 #############################################################################################
+
 
 
 Group <- setRefClass(
   "group",
-  fields = list(table = "data.frame", list='list'),
+  fields = list(table = "data.frame", list='list',color.map='data.frame'),
   methods = list(
     initialize = function(data) {
       table<<-data
       list <<-split(table, table$Group)
+      color.map<<-data.frame(
+        group=groupFactorLevel,
+        colors=c('#00FF00','#00BFFF','#FFB90F','#FF0000')
+      )
     },
     select = function(groups,colors=NULL) {
-      color_map<-data.frame(
-        group=c('L0','L1','L2','L3'),
-        colors=c('green3','cyan','orange','red')
-      )
       out<-data.frame()
       for(i in 1:length(groups)){
         tmp<-list[[groups[i]]]
         if(!is.null(colors)){
         }else{
-          colors<-color_map$colors[match(groups,color_map$group)]
+          colors<-color.map$colors[match(groups,color.map$group)]
         }
         tmp$colors<-colors[i]
         out <- rbind(out,tmp)
       }
       out
+    },
+    selectBySample=function(samples) {
+      tmp<-table[match(samples, table$SampleName),]
+      tmp<-left_join(tmp, color.map, by=c('Group'='group'))
+      tmp
+    },
+    getColorMapVec=function(){
+      color.map.c<-color.map$colors
+      names(color.map.c)<-color.map$group
+      color.map.c
     },
     show = function() {
       print(table(table$Group))
@@ -102,14 +147,14 @@ Group <- setRefClass(
 )
 
 getGroups <- function() {
-  data<-loadData('sampleInfo')
+  data<-loadData2(file.path(CONFIG$dataExternal, 'samples.csv'))
   ret <- list()
   ret$WGBS <- Group$new(filter(data,WGBS=='Yes'))
-  ret$RNA <-  Group$new(filter(data,RNA_seq=='Yes'))
-  ret$ATAC <-  Group$new(filter(data,ATAC_seq=='Yes'))
-  ret$WGBS.RNA <-  Group$new(filter(data,WGBS=='Yes', RNA_seq=='Yes'))
-  ret$WGBS.ATAC <-  Group$new(filter(data,WGBS=='Yes', ATAC_seq=='Yes'))
-  ret$WGBS.RNA.ATAC <- Group$new(filter(data,WGBS=='Yes', RNA_seq=='Yes', ATAC_seq=='Yes'))
+  ret$RNA <-  Group$new(filter(data,RNA.seq=='Yes'))
+  ret$ATAC <-  Group$new(filter(data,ATAC.seq=='Yes'))
+  ret$WGBS.RNA <-  Group$new(filter(data,WGBS=='Yes', RNA.seq=='Yes'))
+  ret$WGBS.ATAC <-  Group$new(filter(data,WGBS=='Yes', ATAC.seq=='Yes'))
+  ret$WGBS.RNA.ATAC <- Group$new(filter(data,WGBS=='Yes', RNA.seq=='Yes', ATAC.seq=='Yes'))
   ret
 }
 
@@ -120,10 +165,15 @@ saveImage <- function(file,...){
   }
 }
 
+saveImage2 <- function(file,...){
+  file.path=file.path(CONFIG$dataResult, file)
+  if (endsWith(file, '.pdf')){
+    pdf(file=file.path, ...)
+  }
+}
 
 ################################################################################################
 groups <- getGroups()
-
 
 
 

@@ -37,8 +37,8 @@ cgiPath<-file.path(CONFIG$dataDir,'cpgIslandExt.hg38.ucsc.bed')
 cpgIslandExt<-loadData('cpgIslandExt.hg38.ucsc', ext='bed', header=FALSE)
 cpgIslandExt<-cpgIslandExt[cpgIslandExt$V1%in%chromFactorLevel,]
 
-chromInfo<-loadData('chromInfo.hg38.ucsc',ext='tsv')
-chromInfo<-chromInfo[chromInfo$`#chrom`%in%chromFactorLevel,]
+genome <- seqlengths(txdb)
+genome <- GRanges(seqnames = names(genome), ranges = IRanges(start = 1, end = genome))
 
 cgIslands <- GRanges(
   seqnames = cpgIslandExt$V1,
@@ -46,13 +46,10 @@ cgIslands <- GRanges(
 )
 cgShoresPre<-resize(cgIslands, width = width(cgIslands) + 2000*2, fix = "center")
 cgShelvesPre<-resize(cgIslands, width = width(cgIslands) + 4000*2, fix = "center")
-cgSeaPre<-GRanges(
-  seqnames = chromInfo$`#chrom`,
-  ranges = IRanges(start = 1, end = chromInfo$size),
-)
+
 cgShores<-setdiff(cgShoresPre, cgIslands)
 cgShelves<-setdiff(cgShelvesPre, cgShoresPre)
-cgSea<-setdiff(cgSeaPre, cgShelvesPre)
+cgSea<-setdiff(genome, cgShelvesPre)
 
 
 
@@ -68,7 +65,7 @@ write.table(fixGranges(cgShelves,out.format='bed3'), file.path(CONFIG$dataAnnota
 write.table(fixGranges(cgSea,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgSea.bed'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
 
 #----------------------------------------------------------------------------------------------------------------------
-# Get the region of TSS, Promoters, 5'UTR, 3'UTR, Introns and Exons
+# Get the region of TSS, Promoters, 5'UTR, 3'UTR, intergenic, Introns and Exons
 #----------------------------------------------------------------------------------------------------------------------
 region.5utr<-unlist(fiveUTRsByTranscript(txdb))
 region.3utr<-unlist(threeUTRsByTranscript(txdb))
@@ -78,6 +75,12 @@ region.promoter.1k<-promoters(txdb, upstream=1000, downstream=1000)
 region.promoter.5k<-promoters(txdb, upstream=5000, downstream=5000)
 region.transcripts<-transcripts(txdb)
 region.tss<-resize(region.transcripts, width=1, fix="start")
+region.gene <- genes(txdb)
+region.gene <- GRanges(
+  seqnames = seqnames(region.gene),
+  ranges = IRanges(start = start(region.gene), end = end(region.gene)),
+)
+region.intergenic<- setdiff(genome, region.gene)
 
 
 
@@ -88,5 +91,12 @@ write.table(fixGranges(region.intron,out.format = 'bed4'), file.path(CONFIG$data
 write.table(fixGranges(region.exons,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'exons.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
 write.table(fixGranges(region.promoter.1k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.1k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
 write.table(fixGranges(region.promoter.5k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.5k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
+write.table(fixGranges(region.intergenic,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intergenic.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
+
+
+
+
+
+
 
 

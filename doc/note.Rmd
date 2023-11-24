@@ -38,6 +38,5 @@ system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.bed -o ./data/in
 
 # Supplementary
 ## Genomic element annotation
-The annotation of GpG islands (CGI) is download from [UCSC Table Browser](https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1773909416_i3FB69HY3DMQvl1e7YgCNw7Iqc3r)
-
+The annotation of GpG islands (CGI) is download from [UCSC Table Browser](https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1773909416_i3FB69HY3DMQvl1e7YgCNw7Iqc3r).
 
