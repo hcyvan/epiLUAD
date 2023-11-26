@@ -22,6 +22,10 @@ CONFIG['dataResult']<-'./data/result'
 DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
+bed2GRanges<-function(bed){
+  GRanges(seqnames = bed[,1], ranges = IRanges(start = bed[,2]+1, end =  bed[,3]))
+}
+
 percent2Numeric <- function(x){
   as.numeric(substr(x,0,nchar(x)-1))/100
 }

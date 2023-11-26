@@ -51,9 +51,6 @@ cgShores<-setdiff(cgShoresPre, cgIslands)
 cgShelves<-setdiff(cgShelvesPre, cgShoresPre)
 cgSea<-setdiff(genome, cgShelvesPre)
 
-
-
-
 saveRDS(fixGranges(cgIslands), file.path(CONFIG$dataIntermediate, 'cgIslands.rds'))
 saveRDS(fixGranges(cgShores), file.path(CONFIG$dataIntermediate, 'cgShores.rds'))
 saveRDS(fixGranges(cgShelves), file.path(CONFIG$dataIntermediate, 'cgShelves.rds'))

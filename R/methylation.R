@@ -188,14 +188,20 @@ drawDensityAll(cgi$L0,cgi$L1,cgi$L2,cgi$L3,'topright')
 dev.off()
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 1 e. The DMC density distribute
+# Figure xxxxxxxxxxx TODO . The DMC density distribute
 #----------------------------------------------------------------------------------------------------------------------
+
+dmcAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
+dmcMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
+dmcIAC<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.IAC.txt'),file.format='bed')
+
 draw.scatter <- function(dmc,xlab,ylab){
   percent <- function(x, digits = 2, format = "f", ...) {
     paste0(formatC(x * 1000, format = format, digits = digits, ...), "‰")
   }
   data<-data.frame(x=dmc$nominalRatio_0, y=dmc$nominalRatio_1)
   palette <- colorRampPalette(c("blue", "yellow", "red"))
+  par(mar = c(5, 5, 4, 3))
   smoothScatter(data,colramp = palette,xlab=xlab,ylab=ylab,cex.lab=2, cex.axis=1.5)
   total<-29401360
   hyper<-table(dmc$class)[1]
@@ -204,19 +210,14 @@ draw.scatter <- function(dmc,xlab,ylab){
   text(x = 0.85, y = 0.15, labels = percent(hypo/total),cex=1.5)
 }
 
-
-dmcL0vsL1<-loadDataBed('dmcL0vsL1')
-dmcL0vsL2<-loadDataBed('dmcL0vsL2')
-dmcL0vsL3<-loadDataBed('dmcL0vsL3')
-
-saveImage("dmc.L0.vs.L1.pdf",width = 4.5,height = 4)
-draw.scatter(dmcL0vsL1, 'L0','L1')
+saveImage2("dmc.CTL.vs.AIS.pdf",width = 4.5,height = 4.5)
+draw.scatter(dmcAIS, 'CTL','AIS')
 dev.off()
-saveImage("dmc.L0.vs.L2.pdf",width = 4.5,height = 4)
-draw.scatter(dmcL0vsL2, 'L0','L2')
+saveImage2("dmc.CTL.vs.MIA.pdf",width = 4.5,height = 4.5)
+draw.scatter(dmcMIA, 'CTL','MIA')
 dev.off()
-saveImage("dmc.L0.vs.L3.pdf",width = 4.5,height = 4)
-draw.scatter(dmcL0vsL3, 'L0','L3')
+saveImage2("dmc.CTL.vs.IAC.pdf",width = 4.5,height = 4.5)
+draw.scatter(dmcIAC, 'CTL','IAC')
 dev.off()
 
 #----------------------------------------------------------------------------------------------------------------------
