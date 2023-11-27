@@ -29,11 +29,14 @@ system("python ./script/methTssSignalMatrix.py -t ./data/annotation/tss.bed -i .
 ## Find SR-DMRs from SR-DMCs
 ```{r}
 setwd('..')
-source('./R/base.R')
-SRDMC<-loadData('SRDMC')
-write.table(SRDMC, './data/intermediate/srdmc.bed',row.names = FALSE,sep = '\t',quote = FALSE)
-system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.bed -o ./data/intermediate/srdmr.bed")
+system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s3.bed -o ./data/intermediate/srdmr.s3.bed")
 
+```
+## Get the Methylation Level of SR-DMC and SR-DMR
+```{bash}
+
+python ./script/methMatrixExtract.py -b /path/to/merge_ratio_bed.gz -r ./data/intermediate/srdmc.s3.bed -o ./data/intermediate/srdmc.s3.ratio.bed
+python ./script/methMatrixExtract.py -b /path/to/merge_ratio_bed.gz -r ./data/intermediate/srdmr.s3.bed -o ./data/intermediate/srdmr.s3.ratio.bed
 ```
 
 # Supplementary
