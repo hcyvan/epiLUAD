@@ -29,7 +29,7 @@ system("python ./script/methTssSignalMatrix.py -t ./data/annotation/tss.bed -i .
 ## Find SR-DMRs from SR-DMCs
 ```{r}
 setwd('..')
-system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s3.bed -o ./data/intermediate/srdmr.s3.bed")
+system("python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/intermediate/srdmr.s2.bed")
 
 ```
 ## Get the Methylation Level of SR-DMC and SR-DMR

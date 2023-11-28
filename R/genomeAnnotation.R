@@ -91,9 +91,21 @@ write.table(fixGranges(region.promoter.5k,out.format = 'bed4'), file.path(CONFIG
 write.table(fixGranges(region.intergenic,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intergenic.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
 
 
-
-
-
+genomicRegion<-list(
+  cgIslands=cgIslands,
+  cgSea=cgSea,
+  cgShelves=cgShelves,
+  cgShores=cgShores,
+  exons=region.exons,
+  intergenic=region.intergenic,
+  intron=region.intron,
+  promoter.1k=region.promoter.1k,
+  promoter.5k=region.promoter.5k,
+  tss=region.tss,
+  utr3=region.3utr,
+  utr5=region.5utr
+)
+saveRDS(genomicRegion, file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 
 
 

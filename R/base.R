@@ -105,6 +105,9 @@ loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE
 chromFactorLevel<-c('chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14',
      'chr15','chr16','chr17','chr18','chr19','chr20','chr21','chr22','chrX','chrY')
 groupFactorLevel<-c('CTL', 'AIS', 'MIA', 'IAC')
+gonomicRegionFactorLevel<-c('cgIslands', 'cgShores', 'cgShelves', 'cgSea',
+                            'tss','promoter.1k', 'promoter.5k', 'utr5', 'utr3','exons','intron','intergenic')
+# stageColor<-c("#31a354", "#addd8e", "#fd8d3c", "#e31a1c")
 #############################################################################################
 
 
@@ -114,6 +117,7 @@ Group <- setRefClass(
   fields = list(table = "data.frame", list='list',color.map='data.frame'),
   methods = list(
     initialize = function(data) {
+      data$Group<-factor(data$Group, levels = groupFactorLevel)
       table<<-data
       list <<-split(table, table$Group)
       color.map<<-data.frame(
@@ -132,11 +136,13 @@ Group <- setRefClass(
         tmp$colors<-colors[i]
         out <- rbind(out,tmp)
       }
+      out$Group<-factor(out$Group, levels = groupFactorLevel)
       out
     },
     selectBySample=function(samples) {
       tmp<-table[match(samples, table$SampleName),]
       tmp<-left_join(tmp, color.map, by=c('Group'='group'))
+      tmp$Group<-factor(tmp$Group, levels = groupFactorLevel)
       tmp
     },
     getColorMapVec=function(){
@@ -178,7 +184,4 @@ saveImage2 <- function(file,...){
 
 ################################################################################################
 groups <- getGroups()
-
-
-
 
