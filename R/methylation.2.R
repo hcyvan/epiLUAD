@@ -5,7 +5,6 @@ library(ggplot2)
 library(GenomicRanges)
 library(rtracklayer)
 library(reshape2)
-library(ComplexHeatmap)
 
 #----------------------------------------------------------------------------------------------------------------------
 # The Average DNA methylation level of some Genomic Regions
@@ -186,8 +185,8 @@ srdmc.count<-count(srdmc,AIS,IAC,MIA)%>%arrange(desc(n))
 SRDMC.count<-count(SRDMC, class)%>%arrange(desc(n))
 
 write.table(SRDMC, file.path(CONFIG$dataIntermediate, 'srdmc.s2.bed'), quote = FALSE, sep = "\t", row.names = FALSE,col.names=FALSE)
-write.table(srdmc.count, file.path(CONFIG$dataIntermediate, 'srdmc.s2.count.detail.bed'), quote = FALSE, sep = "\t", row.names = FALSE)
-write.table(SRDMC.count, file.path(CONFIG$dataIntermediate, 'srdmc.s2.count.bed'), quote = FALSE, sep = "\t", row.names = FALSE)
+write.csv(srdmc.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.detail.csv'), quote = FALSE, row.names = FALSE)
+write.csv(SRDMC.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.csv'), quote = FALSE, row.names = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMC Mehtylation Levels Heatmap
 #----------------------------------------------------------------------------------------------------------------------
@@ -252,18 +251,12 @@ dev.off()
 # SR-DMR
 # eg: python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/intermediate/srdmr.s2.bed
 #----------------------------------------------------------------------------------------------------------------------
-loadSRDMR<-function(){
-  SRDMR<-loadData2(file.path(CONFIG$dataIntermediate, 'srdmr.s2.bed'),header = FALSE)
-  colnames(SRDMR)<-c('chrom','start', 'end', 'class','cpg','length')
-  SRDMR$class<-sub('DMC','DMR',SRDMR$class)
-  SRDMR
-}
-
 SRDMR<-loadSRDMR()
 SRDMR.count<-count(SRDMR, class)%>%arrange(desc(n))
-write.table(SRDMR.count, file.path(CONFIG$dataIntermediate, 'srdmr.s2.count.bed'), quote = FALSE, sep = "\t", row.names = FALSE)
-
-
+write.csv(SRDMR.count, file.path(CONFIG$dataResult, 'srdmr.s2.count.csv'), quote = FALSE, row.names = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR in genomic regions
+#----------------------------------------------------------------------------------------------------------------------
 SRDMR<-loadSRDMR()
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 SRDMR.genomicRegion<-sapply(split(SRDMR,SRDMR$class),function(x){
@@ -272,20 +265,20 @@ SRDMR.genomicRegion<-sapply(split(SRDMR,SRDMR$class),function(x){
     sum(countOverlaps(gr1, gr2))
   })
 })
-#----------------------------------------------------------------------------------------------------------------------
-# SR-DMR in genomic regions
-#----------------------------------------------------------------------------------------------------------------------
 plot.srdmr.barplot.genomicRegion <- function(regions){
   SRDMRgenomicRegion<-data.frame(SRDMR.genomicRegion,check.names = FALSE)
   SRDMRgenomicRegion$region<-rownames(SRDMRgenomicRegion)
   SRDMRgenomicRegion$region<-factor(regions[match(SRDMRgenomicRegion$region,names(regions))],levels = regions)
   SRDMRgenomicRegion<-SRDMRgenomicRegion[!is.na(SRDMRgenomicRegion$region),]
+  # row.sum<-rowSums(SRDMRgenomicRegion[,1:4])
+  # SRDMRgenomicRegion[,1:4]<-apply(SRDMRgenomicRegion[,1:4], 2, function(x) {x/row.sum} )
+  # row.sum<-colSums(SRDMRgenomicRegion[,1:4])
+  # SRDMRgenomicRegion[,1:4]<-t(apply(SRDMRgenomicRegion[,1:4], 1, function(x) {x/row.sum} ))
+  SRDMRgenomicRegion[,1:4]<-log2(SRDMRgenomicRegion[,1:4])
+  print(SRDMRgenomicRegion)
   df<-melt(SRDMRgenomicRegion,variable.name='Stage')
-  stage.colormap<-c("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd")
-  names(stage.colormap)<-levels(df$variable)
-  df$value<-log2(df$value)
   ggplot(data=df, aes(y=value, x=region, fill=Stage))+
-    scale_fill_manual(values=stage.colormap)+
+    scale_fill_manual(values=colorMapSRDMR)+
     geom_bar(stat="identity", position=position_dodge())+
     ylab("Log2(SR-DMR Number)")+
     xlab("Genomic Regions")+
@@ -300,8 +293,195 @@ regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'U
 plot.srdmr.barplot.genomicRegion(regions)
 dev.off()
 
+write.csv(data.frame(t(SRDMR.genomicRegion)), file.path(CONFIG$dataResult, 'srdmr.s2.count.genomicRegion.csv'), quote = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR Density near TSS and CGI
+#----------------------------------------------------------------------------------------------------------------------
+genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
+cgIslands.gr<-genomicRegion$cgIslands
+tss.gr<-genomicRegion$tss
+SRDMR<-bed2GRanges(loadSRDMR())
+
+annoDistQueryToSubject<-function(query, subject){
+  midpoint<-function(gr){
+    mid<-floor((start(gr) + end(gr)) / 2)
+    start(gr)<-mid
+    end(gr)<-mid
+    gr
+  }
+  subject<-midpoint(subject)
+  hits<-distanceToNearest(query, subject)
+  query.hits<-query[queryHits(hits)]
+  subject.hits<-subject[subjectHits(hits)]
+  dist.sign<-ifelse((start(query.hits) > end(subject.hits))&(mcols(hits)$distance!=0),-1,1)
+  query.hits$distanceToSubject<-mcols(hits)$distance * dist.sign
+  query.hits
+}
+distToCGI<-annoDistQueryToSubject(SRDMR,cgIslands.gr)
+distToTSS<-annoDistQueryToSubject(SRDMR,tss.gr)
+
+set.seed(123)
+lim<-50000
+dist<-distToCGI
+dist<-dist[abs(dist$distanceToSubject)<lim,]
+dens<-lapply(split(dist, dist$class), function(x){
+  density(x$distanceToSubject,bw = 'nrd0')
+})
+xlim<-range(sapply(dens, "[", "x"))
+ylim<-range(sapply(dens, "[", "y"))
+
+plot.scdmr.density.tss.vs.cgi<-function(g) {
+  dist1<-distToTSS
+  dist2<-distToCGI
+  dist1<-dist1[dist1$class==g,]
+  dist1<-dist1[abs(dist1$distanceToSubject)<lim,]
+  dist2<-dist2[dist2$class==g,]
+  dist2<-dist2[abs(dist2$distanceToSubject)<lim,]
+  dens<-list(
+    a=density(dist1$distanceToSubject),
+    b=density(dist2$distanceToSubject)
+  )
+  # xlim<-range(sapply(dens, "[", "x"))
+  # ylim<-range(sapply(dens, "[", "y"))
+  colorMap<-c("#0000FF80","#FF000080")
+  names(colorMap)<-c("TSS","CGI")
+  plot(NA, main = g,
+       xlab = "Distance to TSS/CGI",
+       ylab = "SC-DMR Density",
+       xlim=xlim,
+       ylim=ylim,
+       col = "blue")
+  lines(dens$a, lwd = 2,col=colorMap[1])
+  lines(dens$b, lwd = 2,col=colorMap[2])
+  legend("topleft", legend=names(colorMap), fill=colorMap, bty = "n")
+}
+
+saveImage2("srdmr.density.genomicRegion.pdf",width = 6,height = 5)
+par(mfrow = c(2, 2))
+plot.scdmr.density.tss.vs.cgi('Early-Hyper-DMR')
+plot.scdmr.density.tss.vs.cgi('Early-Hypo-DMR')
+plot.scdmr.density.tss.vs.cgi('Late-Hyper-DMR')
+plot.scdmr.density.tss.vs.cgi('Late-Hypo-DMR')
+dev.off()
+
+library(ggExtra)
+library(gridExtra)
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR Length and CpG Number
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-bed2GRanges(loadSRDMR())
+SRDMR.list<-split(SRDMR,SRDMR$class)
+plot.scdmr.status<-function(srdmr.type){
+  SRDMR.list<-split(SRDMR,SRDMR$class)
+  gr<-SRDMR.list[[srdmr.type]]
+  data<-data.frame(x=gr$length, y=gr$cpg)
+  p_scatter <- ggplot(data, aes(x = x, y = y)) +
+    geom_point(size=0.3,alpha = 0.6) +
+    xlab("SC-DMR size (bp)")+
+    ylab("SC-DMR Number")+
+    ggtitle(srdmr.type)+
+    theme_bw()
+  p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
+  p
+}
+p1<-plot.scdmr.status('Early-Hyper-DMR')
+p2<-plot.scdmr.status('Early-Hypo-DMR')
+p3<-plot.scdmr.status('Late-Hyper-DMR')
+p4<-plot.scdmr.status('Late-Hypo-DMR')
+saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 6,height = 6)
+grid.arrange(p1, p2,p3,p4, nrow = 2)
+dev.off()
+srdmr.status<-sapply(SRDMR.list, function(x){
+  out<-c(mean(x$cpg),mean(x$length))
+  names(out)<-c('Average CpG Number', 'Average Size')
+  out
+})
+srdmr.status<-data.frame(srdmr.status)
+write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
+
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR Homer
+#----------------------------------------------------------------------------------------------------------------------
+homerKnownTFs<-function(dir){
+  result.txt<-file.path(dir,'knownResults.txt')
+  result<-read.csv(result.txt,sep='\t')
+  result<-result[result$q.value..Benjamini.< 0.05,]
+  result
+  sapply(result$Motif.Name, function(x){
+    c(strsplit(x,"\\(")[[1]][1])
+  })
+}
 
 
+homerEarlyHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hyper-DMC'))
+homerEarlyHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hypo-DMC'))
+homerLateHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hyper-DMC'))
+homerLateHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hypo-DMC'))
 
+tfs<-do.call(rbind,list(
+  data.frame(tf=homerEarlyHyper, motif=names(homerEarlyHyper),class='Early-Hyper-DMR'),
+  data.frame(tf=homerEarlyHypo, motif=names(homerEarlyHypo),class='Early-Hypo-DMR'),
+  data.frame(tf=homerLateHyper, motif=names(homerLateHyper),class='Late-Hyper-DMR'),
+  data.frame(tf=homerLateHypo, motif=names(homerLateHypo),class='Late-Hypo-DMR')
+))
+tfWidthData<-dcast(tfs, tf~class,fun.aggregate = length)
+motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
 
+motifTable<-data.frame(Motifs=motifWidthData$motif,
+                       TSs=sapply(strsplit(motifTable$motif,'\\('),function(x){x[1]}),
+                       motifWidthData[,2:5])
+write.csv(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE)
+write.table(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE,sep = '\t',quote = FALSE)
 
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR Homer Figure. heatmap
+#----------------------------------------------------------------------------------------------------------------------
+TFS<-dplyr::arrange(tfWidthData, desc(`Early-Hyper-DMR`),desc(`Early-Hypo-DMR`),desc(`Late-Hyper-DMR`),desc(`Late-Hypo-DMR`))
+m<-as.matrix(TFS[,2:ncol(TFS)])
+rownames(m)<-TFS[,1]
+m<-ifelse(m>0,1,0)
+
+column_annotation <-HeatmapAnnotation(
+  df=data.frame(SRDMR=names(colorMapSRDMR)),
+  col = list(SRDMR =colorMapSRDMR),
+  show_annotation_name =FALSE,
+  annotation_name_side='left'
+)
+saveImage2("srdmr.homer.tfs.heatmap.pdf",width = 3,height = 12)
+Heatmap(m,
+        cluster_rows=FALSE,
+        cluster_columns = FALSE,
+        show_row_names=TRUE,
+        show_column_names=FALSE,
+        border = TRUE,
+        show_heatmap_legend = FALSE,
+        col = colorRamp2(breaks = c(0,1.3), colors = c('white', 'black')),
+        top_annotation = column_annotation,
+        column_names_gp = grid::gpar(fontsize = 7),
+        row_names_gp = grid::gpar(fontsize = 5)
+)
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR Homer Figure. heatmap count
+#----------------------------------------------------------------------------------------------------------------------
+data<-tfWidthData[2:5]
+mat<-sapply(names(data), function(x){
+  sapply(names(data), function(y){
+    sum(data[[x]]&data[[y]])
+  })
+})
+mat[upper.tri(mat)] <- NA
+
+saveImage2("srdmr.homer.tfs.heatmap.count.pdf",width = 4,height = 4)
+Heatmap(mat,
+        cluster_rows=FALSE,
+        cluster_columns = FALSE,
+        na_col = "white",
+        show_heatmap_legend = FALSE,
+        col = colorRamp2(breaks = c(min(mat,na.rm=TRUE),max(mat,na.rm=TRUE)), colors = c('#D3D3D3', '#A9A9A9')),
+        cell_fun = function(j, i, x, y, width, height, fill) {
+          if(!is.na(mat[i, j])){
+            grid.text(sprintf("%d", mat[i, j]), x, y, gp = gpar(fontsize = 13, col='black'))
+          }
+        })
+dev.off()

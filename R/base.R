@@ -23,7 +23,11 @@ DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
 bed2GRanges<-function(bed){
-  GRanges(seqnames = bed[,1], ranges = IRanges(start = bed[,2]+1, end =  bed[,3]))
+  gr<-GRanges(seqnames = bed[,1], ranges = IRanges(start = bed[,2]+1, end =  bed[,3]))
+  .<-lapply(colnames(bed)[4:6],function(x){
+    mcols(gr)[[x]]<<-bed[[x]]
+  })
+  gr
 }
 
 percent2Numeric <- function(x){
@@ -108,6 +112,17 @@ groupFactorLevel<-c('CTL', 'AIS', 'MIA', 'IAC')
 gonomicRegionFactorLevel<-c('cgIslands', 'cgShores', 'cgShelves', 'cgSea',
                             'tss','promoter.1k', 'promoter.5k', 'utr5', 'utr3','exons','intron','intergenic')
 # stageColor<-c("#31a354", "#addd8e", "#fd8d3c", "#e31a1c")
+colorMapSRDMR<-c("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd")
+names(colorMapSRDMR)<-c('Early-Hyper-DMR','Early-Hypo-DMR','Late-Hyper-DMR','Late-Hypo-DMR')
+colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')
+names(colorMapStage)<-groupFactorLevel
+
+loadSRDMR<-function(){
+  SRDMR<-loadData2(file.path(CONFIG$dataIntermediate, 'srdmr.s2.bed'),header = FALSE)
+  colnames(SRDMR)<-c('chrom','start', 'end', 'class','cpg','length')
+  SRDMR$class<-sub('DMC','DMR',SRDMR$class)
+  SRDMR
+}
 #############################################################################################
 
 
@@ -121,8 +136,8 @@ Group <- setRefClass(
       table<<-data
       list <<-split(table, table$Group)
       color.map<<-data.frame(
-        group=groupFactorLevel,
-        colors=c('#00FF00','#00BFFF','#FFB90F','#FF0000')
+        group=names(colorMapStage),
+        colors=colorMapStage
       )
     },
     select = function(groups,colors=NULL) {
@@ -146,9 +161,7 @@ Group <- setRefClass(
       tmp
     },
     getColorMapVec=function(){
-      color.map.c<-color.map$colors
-      names(color.map.c)<-color.map$group
-      color.map.c
+      colorMapStage
     },
     show = function() {
       print(table(table$Group))
