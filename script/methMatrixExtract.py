@@ -7,6 +7,11 @@ import gzip
 import time
 import argparse
 
+from pyinstrument import Profiler
+
+profiler = Profiler()
+profiler.start()
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='methMatrixDmr2.py', description='extract dmr from matrix')
@@ -16,6 +21,9 @@ def parse_arguments():
                         help='The G.bed file generate by mcall or G.bed matrix generate by methMatrixGenerate.py')
     parser.add_argument('-r', '--region-bed', required=True, type=argparse.FileType('r'),
                         help='The region to extract region methy ratio')
+    parser.add_argument('-c', '--colnames', default="", help='The colnames be selected '
+                                                             'except #chrom,start,end; if not set, all column will '
+                                                             'be selected.eg: -c name1,name2,name3')
     parser.add_argument('-o', '--out-file', required=True, type=argparse.FileType('w'), help='The output file')
     return parser.parse_args()
 
@@ -61,7 +69,7 @@ class Reader:
 
 
 class Meth:
-    def __init__(self, meth_str):
+    def __init__(self, meth_str, index=None):
         if isinstance(meth_str, str):
             items = meth_str.split('\t')
         else:
@@ -71,8 +79,10 @@ class Meth:
         self.chrom = items[0]
         self.start = int(items[1])
         self.end = int(items[2])
-        self.levels = [float(x) for x in items[3:]]
-
+        if index:
+            self.levels = [float(items[3:][i]) for i in index]
+        else:
+            self.levels = [float(item) for item in items[3:]]
     def __repr__(self):
         return "[{} {} {} {}]".format(self.chrom, self.start, self.end, ' '.join([str(i) for i in self.levels]))
 
@@ -137,18 +147,18 @@ class RegionArray:
 class RegionMap:
     def __init__(self, region_bed, samples=1, header=None):
         self.map: OrderedDict[str, RegionArray] = OrderedDict()
-        r_bed = pd.read_csv(region_bed, sep='\t', header=None)
-        for chr in r_bed[0].unique().tolist():
+        self.r_bed = pd.read_csv(region_bed, sep='\t', header=None)
+        self.header = header
+        for chr in self.r_bed[0].unique().tolist():
             if chr.startswith('#'):
                 continue
-            bed = r_bed[r_bed[0] == chr]
+            bed = self.r_bed[self.r_bed[0] == chr]
             bed = bed.astype({1: int, 2: int})
             bed = bed.sort_values(by=[1])
             regions = RegionArray()
             for row in bed.values:
                 regions.append(Region(row, samples=samples))
             self.map[chr] = regions
-            self.header=header
 
     def print_info(self):
         total = 0
@@ -164,41 +174,54 @@ class RegionMap:
         if regions:
             regions.add_meth(meth, min_cpg)
 
-    #
     def print(self, of=sys.stdout, order=None):
-        if self.header:
-            of.write(self.header + "\n")
+        if self.header is not None:
+            of.write('\t'.join(self.header) + "\n")
         if order:
             for k in order:
                 v = self.map.get(k)
                 if v:
                     for region in v.arr:
-                        level = "\t".join([str(x) for x in region.parse_ratios()])
+                        level = "\t".join([str(round(x,4)) for x in region.parse_ratios()])
                         of.write('{}\t{}\t{}\t{}\n'.format(region.chrom, region.start, region.end, level))
         else:
             for k, v in self.map.items():
                 for region in v.arr:
-                    level = "\t".join([str(x) for x in region.parse_ratios()])
+                    level = "\t".join([str(round(x,4)) for x in region.parse_ratios()])
                     of.write('{}\t{}\t{}\t{}\n'.format(region.chrom, region.start, region.end, level))
 
 
-def extract_region_methy_level(g_bed_file, region_bed, out_file, verbose=False):
+def extract_region_methy_level(g_bed_file, region_bed, colnames, out_file, verbose=False):
     start = time.time()
     g_bed_f = Reader(g_bed_file)
     line = g_bed_f.readline()
     header = None
     if line.startswith("#chrom"):
-        header = line.strip()
+        header = line.strip().split('\t')
         line = g_bed_f.readline()
     g_bed = line.strip().split('\t')
-    rmap = RegionMap(region_bed, samples=len(g_bed) - 3, header=header)
+    if len(colnames) > 0 and header:
+        colnames = colnames.split(',')
+        selectIndices=[]
+        for x in colnames:
+            if x in header:
+                selectIndices.append(header.index(x)-3)
+            else:
+                print("colname {} is not exist".format(x))
+                return
+        header = header[0:3] + [header[i + 3] for i in selectIndices]
+        samples = len(selectIndices)
+    else:
+        samples = len(g_bed) - 3
+        selectIndices = None
+    rmap = RegionMap(region_bed, samples=samples, header=header)
     rmap.print_info()
     i = 0
     while True:
         if verbose and i % 5000000 == 0:
             sys.stderr.write("iter:{}\tuse:{}s\n".format(i, (int(time.time() - start))))
         i += 1
-        meth = Meth(g_bed)
+        meth = Meth(g_bed, selectIndices)
         rmap.add_meth(meth)
         line = g_bed_f.readline()
         if not line:
@@ -208,10 +231,13 @@ def extract_region_methy_level(g_bed_file, region_bed, out_file, verbose=False):
     with open(out_file, 'w') as f:
         rmap.print(of=f)
 
-
 if __name__ == '__main__':
     args = parse_arguments()
     extract_region_methy_level(g_bed_file=args.g_bed.name,
                                region_bed=args.region_bed.name,
+                               colnames=args.colnames,
                                out_file=args.out_file.name,
                                verbose=(not args.quiet))
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True))
+

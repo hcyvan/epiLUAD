@@ -5,6 +5,7 @@ tmp_*/
 *.Rproj
 .Rhistory
 doc/*.html
+R/local/*
 
 
 data/annotation/*
@@ -17,7 +18,6 @@ data/intermediate/*
 !data/intermediate/readme.md
 
 config.yaml
-to.remove.when.public.R
 .RDataTmp
 
 

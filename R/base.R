@@ -22,11 +22,40 @@ CONFIG['dataResult']<-'./data/result'
 DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
+homerKnownTFs<-function(dir){
+  result.txt<-file.path(dir,'knownResults.txt')
+  result<-read.csv(result.txt,sep='\t')
+  result<-result[result$q.value..Benjamini.< 0.05,]
+  result
+  sapply(result$Motif.Name, function(x){
+    c(strsplit(x,"\\(")[[1]][1])
+  })
+}
+
+feature2Bed<-function(feature) {
+  bed<-do.call(rbind,lapply(feature, function(x){
+    tmp<-strsplit(x,':')[[1]]
+    se<-strsplit(tmp[2],'-')[[1]]
+    c(tmp[1], se[1], se[2])
+  }))
+  bed<-data.frame(bed)
+  bed[,2]<-as.numeric(bed[,2])
+  bed[,3]<-as.numeric(bed[,3])
+  colnames(bed)<-c('chrom','start','end')
+  bed
+}
+
+bed2Feature<-function(bed){
+  paste(paste(bed[,1], bed[,2], sep=':'),bed[,3],sep='-')
+}
+
 bed2GRanges<-function(bed){
   gr<-GRanges(seqnames = bed[,1], ranges = IRanges(start = bed[,2]+1, end =  bed[,3]))
-  .<-lapply(colnames(bed)[4:6],function(x){
-    mcols(gr)[[x]]<<-bed[[x]]
-  })
+  if (ncol(bed)>=4){
+    .<-lapply(colnames(bed)[4:ncol(bed)],function(x){
+      mcols(gr)[[x]]<<-bed[[x]]
+    })
+  }
   gr
 }
 
@@ -112,6 +141,8 @@ groupFactorLevel<-c('CTL', 'AIS', 'MIA', 'IAC')
 gonomicRegionFactorLevel<-c('cgIslands', 'cgShores', 'cgShelves', 'cgSea',
                             'tss','promoter.1k', 'promoter.5k', 'utr5', 'utr3','exons','intron','intergenic')
 # stageColor<-c("#31a354", "#addd8e", "#fd8d3c", "#e31a1c")
+colorMapDAR <- c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd")
+names(colorMapDAR)<-c('AISHypoDARs','AISHyperDARs','MIAHypoDARs','MIAHyperDARs','IACHypoDARs','IACHyperDARs')
 colorMapSRDMR<-c("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd")
 names(colorMapSRDMR)<-c('Early-Hyper-DMR','Early-Hypo-DMR','Late-Hyper-DMR','Late-Hypo-DMR')
 colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')

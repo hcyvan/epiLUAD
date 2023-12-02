@@ -5,6 +5,8 @@ library(ggplot2)
 library(GenomicRanges)
 library(rtracklayer)
 library(reshape2)
+library(ggExtra)
+library(gridExtra)
 
 #----------------------------------------------------------------------------------------------------------------------
 # The Average DNA methylation level of some Genomic Regions
@@ -190,20 +192,8 @@ write.csv(SRDMC.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.csv'), quote
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMC Mehtylation Levels Heatmap
 #----------------------------------------------------------------------------------------------------------------------
-select.and.rename <- function(x) {
-  df.wgbs<-groups$WGBS$select(groupFactorLevel)
-  select.data<-x[,match(idNew2Old(df.wgbs$SampleName),colnames(x))]
-  colnames(select.data)<-df.wgbs$SampleName
-  data.fix<-cbind(x[,1:4],select.data)
-  data.fix
-}
-SRDMC<-loadData2(file.path(CONFIG$dataIntermediate, 'srdmc.s2.bed'),force.refresh = TRUE,header = FALSE)
-SRDMC.ratio<-loadData2(file.path(CONFIG$dataIntermediate, 'srdmc.s2.ratio.bed'))
-dataj<-left_join(SRDMC, SRDMC.ratio, by=c('V1'='#chrom','V2'='start'))
-dataj<-dataj[,c(1:4, 6:ncol(dataj))]
-dataj<-select.and.rename(dataj)
-dataj<-split(dataj,dataj$V4)
-
+dataj<-readRDS(file.path(CONFIG$dataIntermediate, 'dmc.methyLevel.rds'))
+dataj<-split(dataj,dataj$class)
 plot.srdmc<-function(data){
   m<-as.matrix(data[,5:ncol(data)])
   m1<-m[rowSums(is.na(m))==0,]
@@ -220,6 +210,7 @@ plot.srdmc<-function(data){
     set.seed(123)
     m1<-m1[sample(1:nrow(m1),10000),]
   }
+  print(dim(m1))
   Heatmap(m1,
           top_annotation = column_annotation,
           cluster_rows=TRUE,
@@ -364,8 +355,6 @@ plot.scdmr.density.tss.vs.cgi('Late-Hyper-DMR')
 plot.scdmr.density.tss.vs.cgi('Late-Hypo-DMR')
 dev.off()
 
-library(ggExtra)
-library(gridExtra)
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMR Length and CpG Number
 #----------------------------------------------------------------------------------------------------------------------
@@ -402,17 +391,6 @@ write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.cs
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMR Homer
 #----------------------------------------------------------------------------------------------------------------------
-homerKnownTFs<-function(dir){
-  result.txt<-file.path(dir,'knownResults.txt')
-  result<-read.csv(result.txt,sep='\t')
-  result<-result[result$q.value..Benjamini.< 0.05,]
-  result
-  sapply(result$Motif.Name, function(x){
-    c(strsplit(x,"\\(")[[1]][1])
-  })
-}
-
-
 homerEarlyHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hyper-DMC'))
 homerEarlyHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hypo-DMC'))
 homerLateHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hyper-DMC'))
@@ -428,11 +406,9 @@ tfWidthData<-dcast(tfs, tf~class,fun.aggregate = length)
 motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
 
 motifTable<-data.frame(Motifs=motifWidthData$motif,
-                       TSs=sapply(strsplit(motifTable$motif,'\\('),function(x){x[1]}),
+                       TSs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
                        motifWidthData[,2:5])
 write.csv(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE)
-write.table(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE,sep = '\t',quote = FALSE)
-
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------
