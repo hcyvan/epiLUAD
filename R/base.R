@@ -155,9 +155,6 @@ loadSRDMR<-function(){
   SRDMR
 }
 #############################################################################################
-
-
-
 Group <- setRefClass(
   "group",
   fields = list(table = "data.frame", list='list',color.map='data.frame'),
