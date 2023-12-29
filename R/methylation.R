@@ -1,12 +1,15 @@
-library(ggplot2)
-library(ggpubr)
-library(ape)
-library(FactoMineR)
-library(factoextra)
-
-
-
 source('./R/base.R')
+library(ComplexHeatmap)
+library(circlize)
+library(ggplot2)
+library(GenomicRanges)
+library(rtracklayer)
+library(reshape2)
+library(ggExtra)
+library(gridExtra)
+library(ggpubr)
+library(Hmisc)
+library(readxl)
 
 drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
   d1 <- density(ratio1)
@@ -20,208 +23,103 @@ drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
   legend(legend.position, legend=c(s1,s2), fill=c("green","red"), bty = "n")
 }
 
-drawDensityAll<-function(r0,r1,r2,r3,legend.position='topleft'){
-  par(mar = c(3,5,1,1))
-  d0<-density(r0)
-  d1<-density(r1)
-  d2<-density(r2)
-  d3<-density(r3)
-  dens <- list(a=d0,b=d1,c=d2,d=d3)
-  plot(NA, xlim=range(sapply(dens, "[", "x")),
-       ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=2, cex.axis=1.5)
-  polygon(d0, border='green3',lwd=1)
-  polygon(d1, border='cyan',lwd=1)
-  polygon(d2, border='orange',lwd=1)
-  polygon(d3, border='red',lwd=1)
-  legend(legend.position, legend=c('L0','L1','L2','L3'), fill=c('green3','cyan','orange','red'), bty = "n",horiz = T)
-}
-
-
 #----------------------------------------------------------------------------------------------------------------------
-# The mean bisulfite conversion and  CpG depth
+# Figure 1A: The Average DNA methylation level of samples in each group
 #----------------------------------------------------------------------------------------------------------------------
-wgbsInfo <- loadData('wgbsInfo')
-conversion <- percent2Numeric(wgbsInfo$MCALL_bisulfite_conversion.ratio)
-cpgDepth <- wgbsInfo$MCALL_CG_depth
-printf("The mean bisulfite conversion is: %s", mean(conversion))
-printf("The mean CpG depth is: %s", mean(cpgDepth))
+tableS3 <- read_excel(file.path(CONFIG$dataExternal, 'SupplementaryData.xlsx'),sheet = 'Table S3')
 
-#----------------------------------------------------------------------------------------------------------------------
-# Figure S1 a. The mean DNA methylation of all samples				
-#----------------------------------------------------------------------------------------------------------------------
-type<-groups$WGBS$select(c('L0','L1','L2','L3'))
-wgbsInfo <- loadData('wgbsInfo')
-wgbsInfo$MCALL_MeanRatioCG_3X<-percent2Numeric(wgbsInfo$MCALL_MeanRatioCG_3X)
-methy<-wgbsInfo[match(type$SampleName ,wgbsInfo$SampleName),]$MCALL_MeanRatioCG_3X
-saveImage("mean.methy.level.all.sample.pdf",width = 10,height = 4)
-barplot(methy,col=type$colors,names=type$SampleName,las=2,cex.names =0.5,ylim=c(0,1.0),ylab="Methylation Level")
-legend("top", 
-       legend = c('L0','L1','L2', 'L3'), 
-       fill = unique(type$colors),bty = "n",ncol = 4)
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure 1 a. The mean DNA methylation of different groups	
-#----------------------------------------------------------------------------------------------------------------------
-wgbsInfo <- loadData('wgbsInfo')
-wgbsInfo$MCALL_MeanRatioCG_3X<-percent2Numeric(wgbsInfo$MCALL_MeanRatioCG_3X)
-methy<-wgbsInfo[match(type$SampleName ,wgbsInfo$SampleName),]$MCALL_MeanRatioCG_3X
-
-data<-data.frame(ratio=methy, group=type$Group, color=type$Group)
-col<-unique(type$colors)
-names(col)<-unique(type$type)
-saveImage("mean.methy.level.all.sample.violin.plot.pdf",width = 6,height = 3.5)
-
-ggplot(data, aes(y=ratio, x=group,fill=color)) +
-  scale_fill_manual(values=col)+
-  geom_violin(trim=FALSE) +
+samples<-groups$WGBS$select(groupFactorLevel)
+samplesMatch<-tableS3[match(samples$SampleName,tableS3$SampleName),]
+data<-data.frame(
+  group=samples$Group,
+  ratio=samplesMatch$MCALL_MeanRatioCG_3X
+)
+saveImage2("methylation.level.mean.pdf",width = 5,height = 3)
+ggplot(data=data,aes(x=group,y=ratio,fill=group))+
+  scale_fill_manual(values=colorMapStage) +
+  # geom_violin(trim=FALSE) +
+  geom_violin(draw_quantiles = NULL, colour = NA,trim=FALSE)+
   geom_jitter(shape=17, position=position_jitter(0.2), colour='black', size=0.5)+
-  stat_summary(fun.data=mean_sdl, mult=1, 
-               geom="pointrange", color="black")+
+  stat_summary(fun.data=mean_sdl, geom="pointrange", color="black")+
   theme_classic()+
-  stat_compare_means( comparisons = list(c('L0','L1'),c('L0','L3')),label = 'p.signif', method = "wilcox.test")+
-  xlab("")+
-  ylab("Mean Methylation Level")+
-  theme(
-    legend.position="right",
-    axis.title.x = element_text(size=0),
-    axis.title.y = element_text(size=12),
-    axis.text = element_text(size = 12,colour="black"),
-    legend.title = element_blank(),
-    legend.text = element_text(size=12)
-  )+
+  stat_compare_means( comparisons = list(c('CTL','AIS'),c('CTL','MIA'),c('CTL','IAC')),
+                      label = 'p.signif', method = "t.test")+
+  labs(x='',y='Mean Methylation Level')+
+  theme(legend.position="right",
+        axis.title.x = element_text(size=0),
+        axis.title.y = element_text(size=15),
+        axis.text = element_text(size = 12,colour="black"),
+        legend.title = element_blank(),
+        legend.text = element_text(size=12))+
   guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
 dev.off()
-
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S1 b. Unsupervised hierarchical clustering
+# Figure 1B: The methylation level density distribution of CTL vs. AIS, CTL vs. MIA and CTL vs. IAC
 #----------------------------------------------------------------------------------------------------------------------
-
-bed <- loadData('sampleMethyLevelDepth10x')
-data <- bed[,-1:-3]
-type<-groups$WGBS$select(c('L0','L1','L2','L3'))
-type <- type[match(colnames(data),type$SampleName),]
-dist_mm<-dist(t(data))
-hclust_avg <- hclust(dist_mm)
-saveImage("methylationLevel.cluster.pdf",width = 10,height = 10)
-par(mar = c(0,0,0,0))
-phyl<-as.phylo(hclust_avg)
-plot(phyl, type = "fan",tip.color=type$colors,label.offset=3.5)
-tiplabels(pch=21, col="black", adj=0, bg=type$colors, cex=2.5)
-dev.off()
-
-saveImage("methylationLevel.cluster.legend.pdf",width = 5,height = 3)
-plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
-legend("topleft", legend =distinct(type,Group,.keep_all = TRUE)$Group,
-       pch=15, pt.cex=3, cex=1.5, bty='n',col = distinct(type,Group,.keep_all = TRUE)$colors,horiz=TRUE)
-dev.off()
-
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure S1 c. principal component analysis
-#----------------------------------------------------------------------------------------------------------------------
-bed <- loadData('sampleMethyLevelDepth10x')
-data <- bed[,-1:-3]
-type<-groups$WGBS$select(c('L0','L1','L2','L3'))
-type <- type[match(colnames(data),type$SampleName),]
-res.pca <- PCA(t(((as.matrix(data)))), graph = FALSE)
-saveImage("methylationLevel.pca.pdf",width = 10,height = 10)
-fviz_pca_ind(res.pca,
-             repel = TRUE,
-             label="none",
-             col.ind=type$Group,
-             palette=distinct(type,Group,.keep_all = TRUE)$colors,
-             addEllipses=TRUE,
-             # ellipse.type='t',
-             # ellipse.level=0.75,
-             ellipse.alpha = 0.01,
-             pointsize =1.5,
-             col.var="black",
-             axes=c(1,2),
-             pointshape = 19)+
-  theme_classic()+
-  theme(plot.title = element_blank(),
-        axis.text=element_text(size=20,colour="black"),axis.title=element_text(size=20),legend.position = "none")
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure 1 b. principal component analysis
-#----------------------------------------------------------------------------------------------------------------------
-groupMethyLevelDepth3xAllLine1<-loadData('groupMethyLevelDepth3xAllLine1')
-line<-removeNegativeOne(groupMethyLevelDepth3xAllLine1)
-saveImage("methyLevel.density.line1.pdf",width = 4,height = 3.5)
+ratio <- loadData2(file.path(CONFIG$dataExternal, 'LAD.group.ratio.bed'))
+ratio<-removeNegativeOne(ratio)
+saveImage2("methylation.level.density.pdf",width = 4,height = 3.5)
 layout(1:3)
 par(mar = c(3,5,1,1))
-drawDensity(line$L0, line$L1, "L0", "L1")
-drawDensity(line$L0, line$L2, "L0", "L2")
-drawDensity(line$L0, line$L3, "L0", "L3")
+drawDensity(ratio$CTL, ratio$AIS, "CTL", "AIS")
+drawDensity(ratio$CTL, ratio$MIA, "CTL", "MIA")
+drawDensity(ratio$CTL, ratio$IAC, "CTL", "IAC")
 dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 1C: The Average DNA methylation level of some Genomic Regions
+#----------------------------------------------------------------------------------------------------------------------
+genomicRegionMethyLevel<-readRDS(file.path(CONFIG$dataExternal, 'genomicRegionMethyLevel.rds'))
+m<-do.call(rbind,lapply(genomicRegionMethyLevel, function(x){
+  x<-x[,4:ncol(x)]
+  colMeans(x,na.rm=TRUE)
+}))
+rownames(m)<-c('CpG Islands', 'CpG Sea','CpG Shelves', 'CpG Shores', 'Exons', 'Intergenic', 'Intron', 'Promoter 1K', 'Promoter 5k', 'TSS', "3'UTR", "5'UTR")
+samples<-groups$WGBS$selectBySample(colnames(m))
 
-#----------------------------------------------------------------------------------------------------------------------
-# Figure S2 a. principal component analysis
-#----------------------------------------------------------------------------------------------------------------------
-groupMethyLevelDepth3xAllLine1<-loadData('groupMethyLevelDepth3xAllLine1')
-line<-removeNegativeOne(groupMethyLevelDepth3xAllLine1)
-saveImage("methyLevel.density.all.line1.pdf",width = 8,height = 3)
-drawDensityAll(line$L0,line$L1,line$L2,line$L3,'topleft')
+color.map<-groups$WGBS$getColorMapVec()
+column_annotation <-HeatmapAnnotation(
+  df=data.frame(Stage=samples$Group),
+  col = list(Stage =color.map),
+  show_annotation_name =FALSE,
+  annotation_name_side='left'
+)
+saveImage2("genomicRegion.heatmap.pdf",width = 12,height = 2.5)
+Heatmap(m,
+        cluster_rows=TRUE,
+        cluster_columns = FALSE,
+        show_column_names=FALSE,
+        bottom_annotation = column_annotation,
+        # column_names_gp = gpar(col = samples$colors)
+        heatmap_legend_param = list(
+          title = "DNA Methylation Levels",
+          legend_height = unit(4, "cm"),
+          at = c(0,0.5,1),
+          labels = c('0','0.5','1'),
+          title_position = "lefttop-rot"
+        ),
+)
 dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+genomicRegionStatistic<-do.call(rbind,lapply(1:nrow(m),function(i){
+  x<-m[i,]
+  g.ctl<-match(groups$WGBS$select('CTL')$SampleName,colnames(m))
+  g.ais<-match(groups$WGBS$select('AIS')$SampleName,colnames(m))
+  g.mia<-match(groups$WGBS$select('MIA')$SampleName,colnames(m))
+  g.iac<-match(groups$WGBS$select('IAC')$SampleName,colnames(m))
+  
+  level.mean<-c(mean(x[g.ctl]),mean(x[g.ais]),mean(x[g.mia]),mean(x[g.iac]))
+  level.sd<-c(sd(x[g.ctl]),sd(x[g.ais]),sd(x[g.mia]),sd(x[g.iac]))
+  #Coefficient of Variation
+  level.cv<-level.sd/level.mean
+  #Interquartile Range, IQR
+  level.iqr <- c(IQR(x[g.ctl]),IQR(x[g.ais]),IQR(x[g.mia]),IQR(x[g.iac]))
+  data.frame(GenomicRange=rownames(m)[i],Group=names(color.map), Mean=level.mean,SD=level.sd, CV=level.cv,IQR=level.iqr)
+}))
+write.csv(genomicRegionStatistic, file.path(CONFIG$dataResult, 'genomicRegionStatistic.csv'),row.names  = FALSE,quote = FALSE)
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S2 a. principal component analysis
-#----------------------------------------------------------------------------------------------------------------------
-saveImage("methyLevel.density.cgi.pdf",width = 4,height = 3.5)
-layout(1:3)
-par(mar = c(3,5,1,1))
-drawDensity(cgi$L0, cgi$L1, "L0", "L1",'topright')
-drawDensity(cgi$L0, cgi$L2, "L0", "L2",'topright')
-drawDensity(cgi$L0, cgi$L3, "L0", "L3",'topright')
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure S2 a. principal component analysis
-#----------------------------------------------------------------------------------------------------------------------
-groupMethyLevelDepth3xAllCgi<-loadData('groupMethyLevelDepth3xAllCgi')
-cgi<-removeNegativeOne(groupMethyLevelDepth3xAllCgi)
-saveImage("methyLevel.density.all.cgi.pdf",width = 8,height = 3)
-drawDensityAll(cgi$L0,cgi$L1,cgi$L2,cgi$L3,'topright')
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure xxxxxxxxxxx TODO . The DMC density distribute
-#----------------------------------------------------------------------------------------------------------------------
-
-dmcAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
-dmcMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
-dmcIAC<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.IAC.txt'),file.format='bed')
-
-draw.scatter <- function(dmc,xlab,ylab){
-  percent <- function(x, digits = 2, format = "f", ...) {
-    paste0(formatC(x * 1000, format = format, digits = digits, ...), "‰")
-  }
-  data<-data.frame(x=dmc$nominalRatio_0, y=dmc$nominalRatio_1)
-  palette <- colorRampPalette(c("blue", "yellow", "red"))
-  par(mar = c(5, 5, 4, 3))
-  smoothScatter(data,colramp = palette,xlab=xlab,ylab=ylab,cex.lab=2, cex.axis=1.5)
-  total<-29401360
-  hyper<-table(dmc$class)[1]
-  hypo<-table(dmc$class)[2]
-  text(x = 0.15, y = 0.85, labels = percent(hyper/total),cex=1.5)
-  text(x = 0.85, y = 0.15, labels = percent(hypo/total),cex=1.5)
-}
-
-saveImage2("dmc.CTL.vs.AIS.pdf",width = 4.5,height = 4.5)
-draw.scatter(dmcAIS, 'CTL','AIS')
-dev.off()
-saveImage2("dmc.CTL.vs.MIA.pdf",width = 4.5,height = 4.5)
-draw.scatter(dmcMIA, 'CTL','MIA')
-dev.off()
-saveImage2("dmc.CTL.vs.IAC.pdf",width = 4.5,height = 4.5)
-draw.scatter(dmcIAC, 'CTL','IAC')
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure 1 d. Methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
+# Figure 1D. Methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
 #----------------------------------------------------------------------------------------------------------------------
 smooth2 <- function(hw=51) {
   function(arr){
@@ -241,67 +139,476 @@ smooth2 <- function(hw=51) {
   }
 }
 
-plot.group.methy.profile<- function(UP,DWON,ylab="Methylation Level",cex=1.5,horiz=FALSE){
+
+plot.group.methy.profile<- function(UP,DWON,signal.file,ylab="Methylation Level",xlab="Distance to TSS (bp)",cex=1.5,horiz=FALSE, draw.legend=TRUE){
   x<-seq(UP, DWON)
-  signalMatrixGroup<-loadDataBed('signalMatrixGroup')
+  signalMatrixGroup<-loadData2(signal.file)
   mmData<-signalMatrixGroup[,-1]
   mm<-mmData[(15001+UP):(15001+DWON),]
+  # mm<-t(scale(t(mm)))
   mm<-as.data.frame(apply(mm,2,smooth2(51)))
   mm<-as.data.frame(mm)
   par(mar = c(5,5,1,1))
-  plot(NA, xlim=c(UP, DWON), xlab="Distance to TSS (bp)",ylab=ylab,cex.lab=2, cex.axis=1.5,ylim=c(min(mm),max(mm)))
-  lines(x,mm[["L0"]],col=alpha("green3", 0.5))
-  lines(x,mm[["L1"]],col=alpha("cyan", 0.5))
-  lines(x,mm[["L2"]],col=alpha("orange", 0.5))
-  lines(x,mm[["L3"]],col=alpha("red", 0.5))
-  legend("bottomleft",legend=c("L0","L1","L2","L3"),fill=c("green3","cyan","orange","red"),bty = "n",cex=cex,horiz = horiz)
-}
-saveImage("methyLevel.profile.pdf",width = 6,height = 4)
-plot.group.methy.profile(-5000, 5000)
-dev.off()
-
-#----------------------------------------------------------------------------------------------------------------------
-# Figure S1 c. The variation of methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
-#----------------------------------------------------------------------------------------------------------------------
-plot.sample.methy.profile <- function(UP,DWON){
-  signalMatrixSample<-loadDataBed('signalMatrixSample')
-  mmData<-signalMatrixSample[,-1]
-  type<-groups$WGBS$select(c('L0','L1','L2','L3'))
-  samples<-colnames(mmData)
-  colors<-type$colors[match(samples,type$SampleName)]
-  ylab="Methylation Level"
-  x<-seq(UP, DWON)
-  mm<-mmData[(15001+UP):(15001+DWON),]
-  par(mar = c(5,5,1,1))
-  plot(NA, xlim=c(UP, DWON), ylim=c(min(mm),max(mm)), xlab="bp to TSS",ylab=ylab,cex.lab=2, cex.axis=1.5)
-  
-  for(i in 1:length(samples)){
-    lines(x,mm[[samples[i]]],col=alpha(colors[i],0.3))
+  if (draw.legend){
+    plot(NA, xlim=c(UP, DWON), xlab=xlab,ylab=ylab,cex.lab=1.5, cex.axis=1.5,ylim=c(min(mm),max(mm)), bty='n')
+  }else{
+    plot(NA, xlim=c(UP, DWON),cex.lab=1.5, cex.axis=1.5,ylim=c(min(mm),max(mm)), xaxt='n',yaxt='n',xlab = "",ylab = "")
   }
-  legend("bottomleft",legend=c("L0","L1","L2","L3"),fill=c("green3","cyan","orange","red"),bty = "n",cex=1,horiz = T)
+  lines(x,mm[["CTL"]],col=colorMapStage[1])
+  lines(x,mm[["AIS"]],col=colorMapStage[2])
+  lines(x,mm[["MIA"]],col=colorMapStage[3])
+  lines(x,mm[["IAC"]],col=colorMapStage[4])
+  if (draw.legend){
+    legend("bottomleft",legend=names(colorMapStage),fill=colorMapStage,bty = "n",cex=cex,horiz = horiz)
+  }
 }
-saveImage("methyLevel.profile.1.pdf",width = 5,height = 5)
-plot.sample.methy.profile(-5000,-4900)
+saveImage2("methylation.level.profile.cgi.pdf",width = 5,height = 5)
+plot.group.methy.profile(-5000, 5000,file.path(CONFIG$dataIntermediate, "signalRoundCgiMatrixGroup.bed"),xlab="Distance to CGI Center (bp)")
 dev.off()
-saveImage("methyLevel.profile.2.pdf",width = 5,height = 5)
-plot.sample.methy.profile(-1000,-0)
+saveImage2("methylation.level.profile.cgi.2.pdf",width = 4,height = 4)
+plot.group.methy.profile(-500, 500,file.path(CONFIG$dataIntermediate, "signalRoundCgiMatrixGroup.bed"),xlab="Distance to CGI Center (bp)",draw.legend=FALSE)
 dev.off()
-saveImage("methyLevel.profile.3.pdf",width = 5,height = 5)
-plot.sample.methy.profile(4900,5000)
+saveImage2("methylation.level.profile.cgi.3.pdf",width = 4,height = 4)
+plot.group.methy.profile(2000, 3000,file.path(CONFIG$dataIntermediate, "signalRoundCgiMatrixGroup.bed"),xlab="Distance to CGI Center (bp)",draw.legend=FALSE)
 dev.off()
 
-UP<--5000
-DWON<-5000
-x<-seq(UP, DWON)
-mm<-mmData[(15001+UP):(15001+DWON),]
-SD<-apply(mm,1, function(x){
-  sd(x)
+saveImage2("methylation.level.profile.tss.pdf",width = 5,height = 5)
+plot.group.methy.profile(-5000, 5000,file.path(CONFIG$dataIntermediate, "signalRoundTssMatrixGroup.bed"),xlab="Distance to TSS (bp)")
+dev.off()
+saveImage2("methylation.level.profile.tss.2.pdf",width = 4,height = 4)
+plot.group.methy.profile(-500, 500,file.path(CONFIG$dataIntermediate, "signalRoundTssMatrixGroup.bed"),xlab="Distance to TSS (bp)",draw.legend=FALSE)
+dev.off()
+saveImage2("methylation.level.profile.tss.3.pdf",width = 4,height = 4)
+plot.group.methy.profile(2000, 3000,file.path(CONFIG$dataIntermediate, "signalRoundTssMatrixGroup.bed"),xlab="Distance to TSS (bp)",draw.legend=FALSE)
+dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Table S5. Hyper-DMCs and Hypo-DMCs of different group in LUAD				
+#----------------------------------------------------------------------------------------------------------------------
+dmcCTLvsAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
+dmcCTLvsMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
+dmcCTLvsIAC<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.IAC.txt'),file.format='bed')
+sum(table(dmcCTLvsAIS$class))
+sum(table(dmcCTLvsMIA$class))
+sum(table(dmcCTLvsIAC$class))
+CTLvsAIS<-data.frame(group="CTL vs. AIS", class=dmcCTLvsAIS$class)
+CTLvsMIA<-data.frame(group="CTL vs. MIA", class=dmcCTLvsMIA$class)
+CTLvsIAC<-data.frame(group="CTL vs. IAC", class=dmcCTLvsIAC$class)
+data<-Reduce(rbind, list(CTLvsAIS,CTLvsMIA,CTLvsIAC))
+target<-table(data)
+test <- chisq.test(target)
+print(target)
+print(test$residuals)
+print(test)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Table S6. Hyper-DMCs and Hypo-DMCs in different genomic regions
+#----------------------------------------------------------------------------------------------------------------------
+genomicRegionMethyLevel<-readRDS(file.path(CONFIG$dataExternal, 'genomicRegionMethyLevel.rds'))
+dmcCTLvsAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
+dmcCTLvsMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
+dmcCTLvsIAC<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.IAC.txt'),file.format='bed')
+countDmcInGonomicRegion<-function(dmc) {
+  hyper<-bed2GRanges(filter(dmc, class=='strongHyper'))
+  hypo<-bed2GRanges(filter(dmc, class=='strongHypo'))
+  count<-sapply(names(genomicRegionMethyLevel),function(x){
+    bed<-genomicRegionMethyLevel[[x]]
+    gr1<-bed2GRanges(bed)
+    # rbind(sum(countOverlaps(gr1, hyper)), sum(countOverlaps(gr1, hypo)), sum(width(gr1))/(1000*1000))
+    rbind(sum(countOverlaps(gr1, hyper)), sum(countOverlaps(gr1, hypo)))
+  })
+  # rownames(count) <- c('hyper', 'hypo', 'regionSizeMb')
+  rownames(count) <- c('hyper', 'hypo')
+  data.frame(count)
+}
+statistic<-list(
+  AIS=countDmcInGonomicRegion(dmcCTLvsAIS),
+  MIA=countDmcInGonomicRegion(dmcCTLvsMIA),
+  AIC=countDmcInGonomicRegion(dmcCTLvsIAC)
+)
+
+genomicRegionDmc<-do.call(rbind,lapply(names(genomicRegionMethyLevel), function(region){
+  data<-t(do.call(cbind,lapply(names(statistic), function(group){
+    item<-statistic[[group]]
+    item[region]
+  })))
+  rownames(data)<-paste(c('CTL.vs.AIS', 'CTL.vs.MIA', 'CTL.vs.IAC'),region)
+  test <- chisq.test(data)
+  out<-data.frame(cbind(data, test$residuals))
+  out$region <- region
+  out
+  print(test)
+}))
+genomicRegionDmc
+write.csv(genomicRegionDmc, file.path(CONFIG$dataResult, 'genomicRegionDmc.csv'),quote = FALSE)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Table S7. SR-DMC
+#----------------------------------------------------------------------------------------------------------------------
+dmcCTLvsAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
+dmcCTLvsMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
+dmcCTLvsIAC<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.IAC.txt'),file.format='bed')
+
+extractDmc <- function(dmc,group) {
+  dmc2<-dmc[,match(c('#chrom','start','end', 'class'),colnames(dmc))]
+  colnames(dmc2)<-c('chrom','start','end', 'class')
+  dmc2$class<-'Hypo'
+  dmc2$class[dmc$class=='strongHyper'] <- 'Hyper'
+  dmc2$group<-group
+  dmc2
+}
+dmc<-list(
+  AIS=extractDmc(dmcCTLvsAIS,'AIS'),
+  MIA=extractDmc(dmcCTLvsMIA,'MIA'),
+  IAC=extractDmc(dmcCTLvsIAC,'IAC')
+)
+lData<-Reduce(rbind, dmc)
+srdmc<-dcast(lData,chrom + start+ end ~ group,value.var = 'class')
+srdmc[,4:6][is.na(srdmc[,4:6])] <- "NC"
+EarlyHyperDmc<-Reduce(rbind,list(
+  filter(srdmc,AIS=='Hyper',MIA=="Hyper", IAC=="Hyper"),
+  filter(srdmc,AIS=='Hyper',MIA=="Hyper", IAC=="NC"),
+  filter(srdmc,AIS=='Hyper',MIA=="NC", IAC=="NC"),
+  filter(srdmc,AIS=='NC',MIA=="Hyper", IAC=="NC"),
+  filter(srdmc,AIS=='NC',MIA=="Hyper", IAC=="Hyper")
+))%>%mutate(class='Early-Hyper-DMC')%>%dplyr::select(chrom, start,end,class)
+EarlyHypoDmc<-Reduce(rbind,list(
+  filter(srdmc,AIS=='Hypo',MIA=="Hypo", IAC=="Hypo"),
+  filter(srdmc,AIS=='Hypo',MIA=="Hypo", IAC=="NC"),
+  filter(srdmc,AIS=='Hypo',MIA=="NC", IAC=="NC"),
+  filter(srdmc,AIS=='NC',MIA=="Hypo", IAC=="NC"),
+  filter(srdmc,AIS=='NC',MIA=="Hypo", IAC=="Hypo")
+))%>%mutate(class='Early-Hypo-DMC')%>%dplyr::select(chrom, start,end,class)
+
+
+LateHyperDmc<-filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hyper")%>%mutate(class='Late-Hyper-DMC')%>%dplyr::select(chrom, start,end,class)
+LateHypoDmc<-filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hypo")%>%mutate(class='Late-Hypo-DMC')%>%dplyr::select(chrom, start,end,class)
+
+SRDMC<-Reduce(rbind,list(EarlyHyperDmc,EarlyHypoDmc,LateHyperDmc,LateHypoDmc))
+SRDMC$chrom <- factor(SRDMC$chrom, levels=chromFactorLevel)
+SRDMC<-arrange(SRDMC, chrom, start)
+
+srdmc.count<-count(srdmc,AIS,IAC,MIA)%>%arrange(desc(n))
+SRDMC.count<-count(SRDMC, class)%>%arrange(desc(n))
+
+write.table(SRDMC, file.path(CONFIG$dataIntermediate, 'srdmc.s2.bed'), quote = FALSE, sep = "\t", row.names = FALSE,col.names=FALSE)
+write.csv(srdmc.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.detail.csv'), quote = FALSE, row.names = FALSE)
+write.csv(SRDMC.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.csv'), quote = FALSE, row.names = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 2B,C. SR-DMC Mehtylation Levels Heatmap
+#----------------------------------------------------------------------------------------------------------------------
+dataj<-readRDS(file.path(CONFIG$dataIntermediate, 'dmc.methyLevel.rds'))
+dataj<-split(dataj,dataj$class)
+plot.srdmc<-function(data){
+  m<-as.matrix(data[,5:ncol(data)])
+  m1<-m[rowSums(is.na(m))==0,]
+  samples<-groups$WGBS$selectBySample(colnames(m))
+  color.map<-groups$WGBS$getColorMapVec()
+  column_annotation <-HeatmapAnnotation(
+    df=data.frame(Stage=samples$Group),
+    col = list(Stage =color.map),
+    show_annotation_name =FALSE,
+    annotation_name_side='left'
+  )
+  print(dim(m1))
+  if (nrow(m1) >=5000){
+    set.seed(123)
+    m1<-m1[sample(1:nrow(m1),5000),]
+  }
+  print(dim(m1))
+  options(heatmap_raster_threshold = 1000)
+  Heatmap(m1,
+          top_annotation = column_annotation,
+          cluster_rows=TRUE,
+          cluster_columns = FALSE,
+          show_row_names=FALSE,
+          show_column_names=FALSE,
+          heatmap_legend_param = list(
+            title = "DNA Methylation Levels",
+            legend_height = unit(4, "cm"),
+            at = c(0,0.5,1),
+            labels = c('0','0.5','1'),
+            title_position = "lefttop-rot"
+          ),
+  )
+}
+saveImage2("srdmr.heatmap.Early-Hyper-DMC.pdf",width = 5,height = 4)
+plot.srdmc(dataj$`Early-Hyper-DMC`)
+dev.off()
+saveImage2("srdmr.heatmap.Early-Hypo-DMC.pdf",width = 5,height = 4)
+plot.srdmc(dataj$`Early-Hypo-DMC`)
+dev.off()
+saveImage2("srdmr.heatmap.Late-Hyper-DMC.pdf",width = 5,height = 4)
+plot.srdmc(dataj$`Late-Hyper-DMC`)
+dev.off()
+saveImage2("srdmr.heatmap.Late-Hypo-DMC.pdf",width = 5,height = 4)
+plot.srdmc(dataj$`Late-Hypo-DMC`)
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# SR-DMR
+# eg: python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/intermediate/srdmr.s2.bed
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-loadSRDMR()
+SRDMR.count<-count(SRDMR, class)%>%arrange(desc(n))
+write.csv(SRDMR.count, file.path(CONFIG$dataResult, 'srdmr.s2.count.csv'), quote = FALSE, row.names = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Table S8. SR-DMR in genomic regions
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-loadSRDMR()
+genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
+SRDMR.genomicRegion<-sapply(split(SRDMR,SRDMR$class),function(x){
+  gr2<-bed2GRanges(x)
+  sapply(genomicRegion, function(gr1){
+    sum(countOverlaps(gr2, gr1)!=0)
+  })
 })
-SD<--log10(SD)
-saveImage("methyLevel.profile.sd.pdf",width = 7,height = 2.5)
-par(mar = c(5,5,1,1))
-plot(UP:DWON,SD,pch=16,cex=0.1,xlab="bp to TSS",ylab="-Log10(SD)",cex.lab=1, cex.axis=1)
+SRDMR.genomicRegion
+plot.srdmr.barplot.genomicRegion <- function(regions){
+  SRDMRgenomicRegion<-data.frame(SRDMR.genomicRegion,check.names = FALSE)
+  SRDMRgenomicRegion$region<-rownames(SRDMRgenomicRegion)
+  SRDMRgenomicRegion$region<-factor(regions[match(SRDMRgenomicRegion$region,names(regions))],levels = regions)
+  SRDMRgenomicRegion<-SRDMRgenomicRegion[!is.na(SRDMRgenomicRegion$region),]
+  df<-melt(SRDMRgenomicRegion,variable.name='Stage')
+  ggplot(data=df, aes(y=value, x=region, fill=Stage))+
+    scale_fill_manual(values=colorMapSRDMR)+
+    geom_bar(stat="identity", position=position_dodge())+
+    ylab("SR-DMRs Number")+
+    xlab("Genomic Regions")+
+    theme_classic()
+}
+saveImage2("srdmr.barplot.genomicRegion.cpg.pdf",width = 6,height = 2.5)
+regions<-c('cgIslands'='CpG Islands', 'cgShores'='CpG Shores', 'cgShelves'='CpG Shelves', 'cgSea'='CpG Sea')
+plot.srdmr.barplot.genomicRegion(regions)
+dev.off()
+saveImage2("srdmr.barplot.genomicRegion.promoter.pdf",width = 8,height = 2.5)
+regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'UTR", 'utr3'="3'UTR",'exons'='Exons','intron'='Intron','intergenic'='Intergenic')
+plot.srdmr.barplot.genomicRegion(regions)
 dev.off()
 
+write.csv(data.frame(t(SRDMR.genomicRegion)), file.path(CONFIG$dataResult, 'srdmr.s2.count.genomicRegion.csv'), quote = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 2D. SR-DMR Density near TSS and CGI
+#----------------------------------------------------------------------------------------------------------------------
+genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
+cgIslands.gr<-genomicRegion$cgIslands
+tss.gr<-genomicRegion$tss
+SRDMR<-bed2GRanges(loadSRDMR())
 
+annoDistQueryToSubject<-function(query, subject){
+  midpoint<-function(gr){
+    mid<-floor((start(gr) + end(gr)) / 2)
+    start(gr)<-mid
+    end(gr)<-mid
+    gr
+  }
+  subject<-midpoint(subject)
+  hits<-distanceToNearest(query, subject)
+  query.hits<-query[queryHits(hits)]
+  subject.hits<-subject[subjectHits(hits)]
+  dist.sign<-ifelse((start(query.hits) > end(subject.hits))&(mcols(hits)$distance!=0),-1,1)
+  query.hits$distanceToSubject<-mcols(hits)$distance * dist.sign
+  query.hits
+}
+distToCGI<-annoDistQueryToSubject(SRDMR,cgIslands.gr)
+distToTSS<-annoDistQueryToSubject(SRDMR,tss.gr)
 
+set.seed(123)
+lim<-50000
+dist<-distToCGI
+dist<-dist[abs(dist$distanceToSubject)<lim,]
+dens<-lapply(split(dist, dist$class), function(x){
+  density(x$distanceToSubject,bw = 'nrd0')
+})
+xlim<-range(sapply(dens, "[", "x"))
+ylim<-range(sapply(dens, "[", "y"))
+
+plot.scdmr.density.tss.vs.cgi<-function(g) {
+  dist1<-distToTSS
+  dist2<-distToCGI
+  dist1<-dist1[dist1$class==g,]
+  dist1<-dist1[abs(dist1$distanceToSubject)<lim,]
+  dist2<-dist2[dist2$class==g,]
+  dist2<-dist2[abs(dist2$distanceToSubject)<lim,]
+  dens<-list(
+    a=density(dist1$distanceToSubject),
+    b=density(dist2$distanceToSubject)
+  )
+  # xlim<-range(sapply(dens, "[", "x"))
+  # ylim<-range(sapply(dens, "[", "y"))
+  colorMap<-c("#0000FF80","#FF000080")
+  names(colorMap)<-c("TSS","CGI")
+  plot(NA, main = g,
+       xlab = "Distance to TSS/CGI",
+       ylab = "SC-DMR Density",
+       xlim=xlim,
+       ylim=ylim,
+       col = "blue")
+  lines(dens$a, lwd = 2,col=colorMap[1])
+  lines(dens$b, lwd = 2,col=colorMap[2])
+  legend("topleft", legend=names(colorMap), fill=colorMap, bty = "n")
+}
+
+saveImage2("srdmr.density.genomicRegion.pdf",width = 6,height = 5)
+par(mfrow = c(2, 2))
+plot.scdmr.density.tss.vs.cgi('Early-Hyper-DMR')
+plot.scdmr.density.tss.vs.cgi('Early-Hypo-DMR')
+plot.scdmr.density.tss.vs.cgi('Late-Hyper-DMR')
+plot.scdmr.density.tss.vs.cgi('Late-Hypo-DMR')
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 2E,F. GREAT analysis of SR-DMR
+#----------------------------------------------------------------------------------------------------------------------
+plot.great<-function(tsv,title="") {
+  enrich<-loadData2(tsv, comment.char = "#", header=FALSE)
+  enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
+  colnames(enrich)<-enrich.col
+  data<-data.frame(x=enrich$TermName,y=-log10(enrich$BinomFDRQVal))
+  data<-data[order(data$y),]
+  ggplot(data, aes(x=x, y=y))+
+    geom_bar(stat="identity", width=0.3, fill='black')+
+    coord_flip()+
+    scale_x_discrete(limits=data$x,labels = NULL )+
+    theme_classic()+
+    theme(legend.position="none")+
+    scale_y_continuous(expand = c(0,0))+
+    annotate("text", x=seq(1, nrow(data))+0.4, y=0,
+             hjust = 0, cex=3,
+             label= data$x)+
+    labs(x="", y="-Log10(q-value)",title=title)+
+    theme( axis.ticks.y = element_blank(),
+           axis.line.y = element_blank(),
+           axis.text.y = element_blank())
+}
+saveImage2("srdmr.great.EarlyHyperDmr.BP.pdf",width = 4,height = 6)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hyper-DMC.great.GOBiologicalProcess.tsv"),title="")
+dev.off()
+saveImage2("srdmr.great.EarlyHyperDmr.CC.pdf",width = 4,height = 2)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hyper-DMC.great.GOCellularComponent.tsv"),title="Cellular Component")
+dev.off()
+saveImage2("srdmr.great.EarlyHypoDmr.BP.pdf",width = 4,height = 3)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hypo-DMC.great.GOBiologicalProcess.tsv"),title="Biological Process")
+dev.off()
+saveImage2("srdmr.great.LateHyperDmr.BP.pdf",width = 4,height = 6)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hyper-DMC.great.GOBiologicalProcess.tsv"),title="Biological Process")
+dev.off()
+saveImage2("srdmr.great.LateHyperDmr.MF.pdf",width = 7,height = 6)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hyper-DMC.great.GOMolecularFunction.tsv"),title="Molecular Function")
+dev.off()
+saveImage2("srdmr.great.LateHypoDmr.BP.pdf",width = 4,height = 3.5)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOBiologicalProcess.tsv"),title="")
+dev.off()
+saveImage2("srdmr.great.LateHypoDmr.MF.pdf",width = 7,height = 1.5)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOMolecularFunction.tsv"),title="Molecular Function")
+dev.off()
+saveImage2("srdmr.great.LateHypoDmr.CC.pdf",width = 4,height = 1.5)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOCellularComponent.tsv"),title="Cellular Component")
+dev.off()
+saveImage2("srdmr.great.LateHypoDmr.HPO.pdf",width = 4,height = 1.5)
+plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.HumanPhenotypeOntology.tsv"),title="Human Phenotype Ontology")
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 2E. SR-DMR Length and CpG Number
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-bed2GRanges(loadSRDMR())
+SRDMR.list<-split(SRDMR,SRDMR$class)
+plot.scdmr.status<-function(srdmr.type){
+  SRDMR.list<-split(SRDMR,SRDMR$class)
+  gr<-SRDMR.list[[srdmr.type]]
+  data<-data.frame(x=gr$length, y=gr$cpg)
+  p_scatter <- ggplot(data, aes(x = x, y = y)) +
+    geom_point(size=0.3,alpha = 0.6) +
+    xlab("SC-DMR size (bp)")+
+    ylab("SC-DMR Number")+
+    ggtitle(srdmr.type)+
+    theme_bw()
+  p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
+  p
+}
+p1<-plot.scdmr.status('Early-Hyper-DMR')
+p2<-plot.scdmr.status('Early-Hypo-DMR')
+p3<-plot.scdmr.status('Late-Hyper-DMR')
+p4<-plot.scdmr.status('Late-Hypo-DMR')
+saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 6,height = 6)
+grid.arrange(p1, p2,p3,p4, nrow = 2)
+dev.off()
+srdmr.status<-sapply(SRDMR.list, function(x){
+  out<-c(mean(x$cpg),mean(x$length))
+  names(out)<-c('Average CpG Number', 'Average Size')
+  out
+})
+srdmr.status<-data.frame(srdmr.status)
+write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Table S9. SR-DMR Homer
+#----------------------------------------------------------------------------------------------------------------------
+homerEarlyHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hyper-DMC'))
+homerEarlyHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hypo-DMC'))
+homerLateHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hyper-DMC'))
+homerLateHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hypo-DMC'))
+
+tfs<-do.call(rbind,list(
+  data.frame(tf=homerEarlyHyper, motif=names(homerEarlyHyper),class='Early-Hyper-DMR'),
+  data.frame(tf=homerEarlyHypo, motif=names(homerEarlyHypo),class='Early-Hypo-DMR'),
+  data.frame(tf=homerLateHyper, motif=names(homerLateHyper),class='Late-Hyper-DMR'),
+  data.frame(tf=homerLateHypo, motif=names(homerLateHypo),class='Late-Hypo-DMR')
+))
+tfWidthData<-dcast(tfs, tf~class,fun.aggregate = length)
+motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
+
+motifTable<-data.frame(Motifs=motifWidthData$motif,
+                       TFs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
+                       motifWidthData[,2:5])
+write.csv(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S1B. SR-DMR Homer Figure. heatmap
+#----------------------------------------------------------------------------------------------------------------------
+TFS<-dplyr::arrange(tfWidthData, desc(`Early-Hyper-DMR`),desc(`Early-Hypo-DMR`),desc(`Late-Hyper-DMR`),desc(`Late-Hypo-DMR`))
+m<-as.matrix(TFS[,2:ncol(TFS)])
+rownames(m)<-TFS[,1]
+m<-ifelse(m>0,1,0)
+
+column_annotation <-HeatmapAnnotation(
+  df=data.frame(SRDMR=names(colorMapSRDMR)),
+  col = list(SRDMR =colorMapSRDMR),
+  show_annotation_name =FALSE,
+  annotation_name_side='left'
+)
+saveImage2("srdmr.homer.tfs.heatmap.pdf",width = 3,height = 12)
+Heatmap(m,
+        cluster_rows=FALSE,
+        cluster_columns = FALSE,
+        show_row_names=TRUE,
+        show_column_names=FALSE,
+        border = TRUE,
+        show_heatmap_legend = FALSE,
+        col = colorRamp2(breaks = c(0,1.3), colors = c('white', 'black')),
+        top_annotation = column_annotation,
+        column_names_gp = grid::gpar(fontsize = 7),
+        row_names_gp = grid::gpar(fontsize = 5)
+)
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S1C. SR-DMR Homer Figure. heatmap count
+#----------------------------------------------------------------------------------------------------------------------
+data<-tfWidthData[2:5]
+mat<-sapply(names(data), function(x){
+  sapply(names(data), function(y){
+    sum(data[[x]]&data[[y]])
+  })
+})
+mat[upper.tri(mat)] <- NA
+
+saveImage2("srdmr.homer.tfs.heatmap.count.pdf",width = 4,height = 4)
+Heatmap(mat,
+        cluster_rows=FALSE,
+        cluster_columns = FALSE,
+        na_col = "white",
+        show_heatmap_legend = FALSE,
+        col = colorRamp2(breaks = c(min(mat,na.rm=TRUE),max(mat,na.rm=TRUE)), colors = c('#D3D3D3', '#A9A9A9')),
+        cell_fun = function(j, i, x, y, width, height, fill) {
+          if(!is.na(mat[i, j])){
+            grid.text(sprintf("%d", mat[i, j]), x, y, gp = gpar(fontsize = 13, col='black'))
+          }
+        })
+dev.off()

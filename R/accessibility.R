@@ -2,12 +2,14 @@ source('./R/base.R')
 library(ChIPseeker)
 library(DESeq2)
 library(reshape2)
+library(ggplot2)
 library(circlize)
+library(GenomicRanges)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
 
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq Peak
+# Figure 3A. ATAC-seq Peak
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-loadData2(file.path(CONFIG$dataIntermediate, 'atac','atacPeak.bed'),header = FALSE, force.refresh = TRUE)
 set.seed(123)
@@ -77,7 +79,7 @@ saveDAR(darDeseq2$darCTLvsAIS,'dar.p400.AIS.hypo.bed','dar.p400.AIS.hyper.bed')
 saveDAR(darDeseq2$darCTLvsMIA,'dar.p400.MIA.hypo.bed','dar.p400.MIA.hyper.bed')
 saveDAR(darDeseq2$darCTLvsIAC,'dar.p400.IAC.hypo.bed','dar.p400.IAC.hyper.bed')
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR numbers and Upset plot
+# Figure 3B. ATAC-seq: DAR numbers and Upset plot
 #----------------------------------------------------------------------------------------------------------------------
 darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 dar<-list(
@@ -100,56 +102,8 @@ saveImage2("atac.dar.upset.pdf",width = 6,height = 4)
 UpSet(m, set_order = setOrder, comb_order = order(-comb_size(m)))
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR in genomic regions
+# Figure 3C. ATAC-seq: DAR Density near TSS and CGI
 #----------------------------------------------------------------------------------------------------------------------
-darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
-DAR<-list(
-  AISHyperDARs=rownames(darDeseq2$darCTLvsAIS$hyper),
-  AISHypoDARs=rownames(darDeseq2$darCTLvsAIS$hypo),
-  MIAHyperDARs=rownames(darDeseq2$darCTLvsMIA$hyper),
-  MIAHypoDARs=rownames(darDeseq2$darCTLvsMIA$hypo),
-  IACHyperDARs=rownames(darDeseq2$darCTLvsIAC$hyper),
-  IACHypoDARs=rownames(darDeseq2$darCTLvsIAC$hypo)
-)
-genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
-DAR.genomicRegion<-sapply(names(DAR),function(x){
-  gr2<-bed2GRanges(feature2Bed(DAR[[x]]))
-  sapply(genomicRegion, function(gr1){
-    sum(countOverlaps(gr1, gr2))
-  })
-})
-DAR.genomicRegion
-plot.dar.barplot.genomicRegion <- function(regions){
-  allRegion<-data.frame(DAR.genomicRegion,check.names = FALSE)
-  allRegion$region<-rownames(allRegion)
-  allRegion$region<-factor(regions[match(allRegion$region,names(regions))],levels = regions)
-  allRegion<-allRegion[!is.na(allRegion$region),]
-  print(allRegion)
-  allRegion[,1:6]<-log2(allRegion[,1:6]+1)
-  print(allRegion)
-  df<-melt(allRegion,variable.name='Stage')
-  print(df)
-  ggplot(data=df, aes(y=value, x=region, fill=Stage))+
-    scale_fill_manual(values=colorMapDAR)+
-    geom_bar(stat="identity", position=position_dodge())+
-    ylab("Log2(DARs Number)")+
-    xlab("Genomic Regions")+
-    theme_classic()
-}
-saveImage2("atac.dar.barplot.genomicRegion.cpg.pdf",width = 5,height = 3)
-regions<-c('cgIslands'='CpG Islands', 'cgShores'='CpG Shores', 'cgShelves'='CpG Shelves', 'cgSea'='CpG Sea')
-plot.dar.barplot.genomicRegion(regions)
-dev.off()
-saveImage2("atac.dar.barplot.genomicRegion.promoter.pdf",width = 8,height = 3)
-regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'UTR", 'utr3'="3'UTR",'exons'='Exons','intron'='Intron','intergenic'='Intergenic')
-plot.dar.barplot.genomicRegion(regions)
-dev.off()
-
-# write.csv(data.frame(t(DAR.genomicRegion)), file.path(CONFIG$dataResult, 'atac.dar.count.genomicRegion.csv'), quote = FALSE)
-#----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR Density near TSS and CGI
-#----------------------------------------------------------------------------------------------------------------------
-library(GenomicRanges)
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 cgIslands.gr<-genomicRegion$cgIslands
 tss.gr<-genomicRegion$tss
@@ -230,6 +184,96 @@ plot.dar.density.tss.vs.cgi('IACHypoDARs')
 dev.off()
 
 #----------------------------------------------------------------------------------------------------------------------
+# Figure 3D. ATAC-seq: DAR in genomic regions
+#----------------------------------------------------------------------------------------------------------------------
+darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
+DAR<-list(
+  AISHyperDARs=rownames(darDeseq2$darCTLvsAIS$hyper),
+  AISHypoDARs=rownames(darDeseq2$darCTLvsAIS$hypo),
+  MIAHyperDARs=rownames(darDeseq2$darCTLvsMIA$hyper),
+  MIAHypoDARs=rownames(darDeseq2$darCTLvsMIA$hypo),
+  IACHyperDARs=rownames(darDeseq2$darCTLvsIAC$hyper),
+  IACHypoDARs=rownames(darDeseq2$darCTLvsIAC$hypo)
+)
+genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
+DAR.genomicRegion<-sapply(names(DAR),function(x){
+  gr2<-bed2GRanges(feature2Bed(DAR[[x]]))
+  sapply(genomicRegion, function(gr1){
+    sum(countOverlaps(gr2, gr1)!=0)
+  })
+})
+plot.dar.barplot.genomicRegion <- function(regions){
+  allRegion<-data.frame(DAR.genomicRegion,check.names = FALSE)
+  allRegion$region<-rownames(allRegion)
+  allRegion$region<-factor(regions[match(allRegion$region,names(regions))],levels = regions)
+  allRegion<-allRegion[!is.na(allRegion$region),]
+  # print(allRegion)
+  # allRegion[,1:6]<-log2(allRegion[,1:6]+1)
+  # print(allRegion)
+  df<-melt(allRegion,variable.name='Stage')
+  print(df)
+  ggplot(data=df, aes(y=value, x=region, fill=Stage))+
+    scale_fill_manual(values=colorMapDAR)+
+    geom_bar(stat="identity", position=position_dodge())+
+    ylab("DARs Number")+
+    xlab("Genomic Regions")+
+    theme_classic()
+}
+saveImage2("atac.dar.barplot.genomicRegion.cpg.pdf",width = 6,height = 2.5)
+regions<-c('cgIslands'='CpG Islands', 'cgShores'='CpG Shores', 'cgShelves'='CpG Shelves', 'cgSea'='CpG Sea')
+plot.dar.barplot.genomicRegion(regions)
+dev.off()
+saveImage2("atac.dar.barplot.genomicRegion.promoter.pdf",width = 8,height = 2.5)
+regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'UTR", 'utr3'="3'UTR",'exons'='Exons','intron'='Intron','intergenic'='Intergenic')
+plot.dar.barplot.genomicRegion(regions)
+dev.off()
+# write.csv(data.frame(t(DAR.genomicRegion)), file.path(CONFIG$dataResult, 'atac.dar.count.genomicRegion.csv'), quote = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 3E,F. GREAT analysis of DMRs
+#----------------------------------------------------------------------------------------------------------------------
+plot.great<-function(tsv,title="") {
+  enrich<-loadData2(tsv, comment.char = "#",header=FALSE)
+  enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
+  colnames(enrich)<-enrich.col
+  data<-data.frame(x=enrich$TermName,y=-log10(enrich$BinomFDRQVal))
+  data<-data[order(data$y),]
+  ggplot(data, aes(x=x, y=y))+
+    geom_bar(stat="identity", width=0.3, fill='black')+
+    coord_flip()+
+    scale_x_discrete(limits=data$x,labels = NULL )+
+    theme_classic()+
+    theme(legend.position="none")+
+    scale_y_continuous(expand = c(0,0))+
+    annotate("text", x=seq(1, nrow(data))+0.4, y=0,
+             hjust = 0, cex=3,
+             label= data$x)+
+    labs(x="", y="-Log10(q-value)",title=title)+
+    theme( axis.ticks.y = element_blank(),
+           axis.line.y = element_blank(),
+           axis.text.y = element_blank())
+}
+saveImage2("dar.great.AIS.hypo.BP.pdf",width = 4,height = 4)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.AIS.hypo.great.GOBiologicalProcess.tsv"),title="")
+dev.off()
+saveImage2("dar.great.AIS.hypo.CC.pdf",width = 4,height = 3)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.AIS.hypo.great.GOCellularComponent.tsv"),title="")
+dev.off()
+saveImage2("dar.great.MIA.hyper.HPO.pdf",width = 4,height = 1.2)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.MIA.hyper.great.HumanPhenotypeOntology.tsv"),title="")
+dev.off()
+saveImage2("dar.great.IAC.hyper.BP.pdf",width = 4,height = 6)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.GOBiologicalProcess.tsv"),title="")
+dev.off()
+saveImage2("dar.great.IAC.hyper.CC.pdf",width = 4,height = 1.2)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.GOCellularComponent.tsv"),title="")
+dev.off()
+saveImage2("dar.great.IAC.hyper.HPO.pdf",width = 4,height = 1.5)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.HumanPhenotypeOntology.tsv"),title="")
+dev.off()
+saveImage2("dar.great.IAC.hypo.BP.pdf",width = 4,height = 1.2)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hypo.great.GOBiologicalProcess.tsv"),title="")
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
 # ATAC-seq: DAR Homer
 #----------------------------------------------------------------------------------------------------------------------
 homerAISHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hyper'))
@@ -240,7 +284,7 @@ homerIACHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mas
 homerIACHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hypo'))
 
 tfs<-do.call(rbind,list(
-  # data.frame(tf=homerAISHyper, motif=names(homerAISHyper),class='AISHyperDARs'),
+  # data.frame(tf=homerAISHyper, motif=names(homerAISHyper),class='AISHyperDARs'), # dim()[1]==0
   data.frame(tf=homerAISHypo, motif=names(homerAISHypo),class='AISHypoDARs'),
   data.frame(tf=homerMIAHyper, motif=names(homerMIAHyper),class='MIAHyperDARs'),
   data.frame(tf=homerMIAHypo, motif=names(homerMIAHypo),class='MIAHypoDARs'),
@@ -248,13 +292,10 @@ tfs<-do.call(rbind,list(
   data.frame(tf=homerIACHypo, motif=names(homerIACHypo),class='IACHypoDARs')
 ))
 tfs$class<-factor(tfs$class, levels = names(colorMapDAR))
-tfWidthData<-dcast(tfs, tf~class,fun.aggregate = length)
 motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
 
-
-
 motifTable<-data.frame(Motifs=motifWidthData$motif,
-                       TSs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
+                       TFs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
                        AISHypoDARs=motifWidthData[,2],
                        AISHyperDARs=0,
                        motifWidthData[,3:ncol(motifWidthData)])

@@ -5,9 +5,7 @@ library(GenomicFeatures)
 library(dplyr)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
-
 txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
-
 fixGranges<- function(gr,out.format='GRanges') {
   gr<-gr[seqnames(gr) %in% chromFactorLevel]
   seqlevels(gr) <- chromFactorLevel
@@ -56,10 +54,10 @@ saveRDS(fixGranges(cgShores), file.path(CONFIG$dataIntermediate, 'cgShores.rds')
 saveRDS(fixGranges(cgShelves), file.path(CONFIG$dataIntermediate, 'cgShelves.rds'))
 saveRDS(fixGranges(cgSea), file.path(CONFIG$dataIntermediate, 'cgSea.rds'))
 
-write.table(fixGranges(cgIslands,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgIslands.bed'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
-write.table(fixGranges(cgShores,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgShores.bed'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
-write.table(fixGranges(cgShelves,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgShelves.bed'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
-write.table(fixGranges(cgSea,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgSea.bed'), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+writeBed(fixGranges(cgIslands,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgIslands.bed'))
+writeBed(fixGranges(cgShores,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgShores.bed'))
+writeBed(fixGranges(cgShelves,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgShelves.bed'))
+writeBed(fixGranges(cgSea,out.format='bed3'), file.path(CONFIG$dataAnnotation, 'cgSea.bed'))
 
 #----------------------------------------------------------------------------------------------------------------------
 # Get the region of TSS, Promoters, 5'UTR, 3'UTR, intergenic, Introns and Exons
@@ -79,17 +77,14 @@ region.gene <- GRanges(
 )
 region.intergenic<- setdiff(genome, region.gene)
 
-
-
-write.table(fixGranges(region.tss,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'tss.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.5utr,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'utr5.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.3utr,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'utr3.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.intron,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intron.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.exons,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'exons.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.promoter.1k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.1k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.promoter.5k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.5k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-write.table(fixGranges(region.intergenic,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intergenic.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'),row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
-
+writeBed(fixGranges(region.tss,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'tss.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.5utr,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'utr5.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.3utr,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'utr3.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.intron,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intron.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.exons,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'exons.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.promoter.1k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.1k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.promoter.5k,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'promoter.5k.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
+writeBed(fixGranges(region.intergenic,out.format = 'bed4'), file.path(CONFIG$dataAnnotation, 'intergenic.TxDb.Hsapiens.UCSC.hg38.knownGene.bed'))
 
 genomicRegion<-list(
   cgIslands=cgIslands,
@@ -107,5 +102,14 @@ genomicRegion<-list(
 )
 saveRDS(genomicRegion, file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 
+#----------------------------------------------------------------------------------------------------------------------
+# Get the center of TSS, CGI
+#----------------------------------------------------------------------------------------------------------------------
+cgiMid<-GRanges(seqnames = genomicRegion$cgIslands@seqnames, ranges = IRanges(start = mid(genomicRegion$cgIslands), end=mid(genomicRegion$cgIslands)))
+tssMid<-genomicRegion$tss
+cgi<-filter(GRanges2bed(cgiMid), chrom%in%chromFactorLevel)
+tss<-filter(GRanges2bed(tssMid), chrom%in%chromFactorLevel)
 
+writeBed(cgi, file.path(CONFIG$dataIntermediate, 'center.cgi.bed'))
+writeBed(tss, file.path(CONFIG$dataIntermediate, 'center.tss.bed'))
 

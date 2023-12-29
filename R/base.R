@@ -1,7 +1,8 @@
 library(dplyr)
 library(yaml)
 library(tools)
-
+library(AnnotationDbi)
+library(org.Hs.eg.db)
 
 configDefaultPath <- './config.default.yaml'
 configPath <- './config.yaml'
@@ -22,10 +23,34 @@ CONFIG['dataResult']<-'./data/result'
 DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
+writeBed<-function(bed,file.name){
+  write.table(bed, file.name,row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
+}
+
+mapEnsemble2Symbol<-function(ensemble){
+  mapIds(org.Hs.eg.db, keys = ensemble, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")
+}
+
+ensemble2Symbol2<-function(ensemble){
+  ensemblMart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+  # saveRDS(ensemblMart, file.path(CONFIG$dataIntermediate, 'biomaRtEnsemblMart.rds'))
+  genes_info <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name'), 
+                      filters = 'ensembl_gene_id', 
+                      values = ensemble, 
+                      mart = ensemblMart)
+  symbols<-genes_info$external_gene_name
+  names(symbols)<-genes_info$ensembl_gene_id
+  symbols
+}
+ensemble2Symbol3<-function(ensemble){
+  ensembl2symbolMap<-readRDS(file.path(CONFIG$dataIntermediate, 'ensembl2symbolMap.rds'))
+  ensembl2symbolMap[match(ensemble,names(ensembl2symbolMap))]
+}
+
 homerKnownTFs<-function(dir){
   result.txt<-file.path(dir,'knownResults.txt')
   result<-read.csv(result.txt,sep='\t')
-  result<-result[result$q.value..Benjamini.< 0.05,]
+  result<-result[result$q.value..Benjamini.< 0.02,]
   result
   sapply(result$Motif.Name, function(x){
     c(strsplit(x,"\\(")[[1]][1])
@@ -57,6 +82,10 @@ bed2GRanges<-function(bed){
     })
   }
   gr
+}
+
+GRanges2bed<-function(gr){
+  data.frame(chrom=seqnames(gr), start=start(gr)-1, end=end(gr))
 }
 
 percent2Numeric <- function(x){
@@ -113,7 +142,7 @@ loadDataBed<-function(name){
 #' @param force.refresh Set TRUE will over write the rds cache
 #' @param header see read.csv
 #'
-loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE) {
+loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE,comment.char = "") {
   filename.rds<-paste0(file_path_sans_ext(filename),'.rds')
   if (is.null(file.format)){
     file.format=file_ext(filename)
@@ -122,12 +151,12 @@ loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE
   if (file.exists(filename.rds) && !force.refresh) {
     readRDS(filename.rds)
   } else {
-    if(file.format=='bed'){
-      data<-read.csv(filename,sep = '\t',check.names = FALSE, header=header)
+    if(file.format=='bed'|file.format=='tsv'){
+      data<-read.csv(filename,sep = '\t',check.names = FALSE, header=header, comment.char=comment.char)
       saveRDS(data, filename.rds)
       data
     } else if(file.format=='csv'){
-      data<-read.csv(filename)
+      data<-read.csv(filename,check.names = FALSE, header=header)
       saveRDS(data, filename.rds)
       data
     }
@@ -187,6 +216,10 @@ Group <- setRefClass(
       tmp<-left_join(tmp, color.map, by=c('Group'='group'))
       tmp$Group<-factor(tmp$Group, levels = groupFactorLevel)
       tmp
+    },
+    pickColumnsByGroup=function(groups, data) {
+      tmp<-select(groups)
+      data[,match(tmp$SampleName, colnames(data))]
     },
     getColorMapVec=function(){
       colorMapStage
