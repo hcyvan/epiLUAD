@@ -11,6 +11,7 @@ library(ggpubr)
 library(Hmisc)
 library(readxl)
 
+
 drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
   d1 <- density(ratio1)
   d2 <- density(ratio2)
@@ -507,7 +508,7 @@ saveImage2("srdmr.great.LateHypoDmr.HPO.pdf",width = 4,height = 1.5)
 plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.HumanPhenotypeOntology.tsv"),title="Human Phenotype Ontology")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2E. SR-DMR Length and CpG Number
+# Figure S1A. SR-DMR Length and CpG Number
 #----------------------------------------------------------------------------------------------------------------------
 SRDMR<-bed2GRanges(loadSRDMR())
 SRDMR.list<-split(SRDMR,SRDMR$class)
@@ -538,7 +539,38 @@ srdmr.status<-sapply(SRDMR.list, function(x){
 })
 srdmr.status<-data.frame(srdmr.status)
 write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
-
+#----------------------------------------------------------------------------------------------------------------------
+# Figure S1A. SR-DMR Length and CpG Number
+#----------------------------------------------------------------------------------------------------------------------
+SRDMR<-bed2GRanges(loadSRDMR())
+SRDMR.list<-split(SRDMR,SRDMR$class)
+plot.scdmr.status<-function(srdmr.type){
+  SRDMR.list<-split(SRDMR,SRDMR$class)
+  gr<-SRDMR.list[[srdmr.type]]
+  data<-data.frame(x=gr$length, y=gr$cpg)
+  p_scatter <- ggplot(data, aes(x = x, y = y)) +
+    geom_point(size=0.3,alpha = 0.6) +
+    xlab("SC-DMR size (bp)")+
+    ylab("SC-DMR Number")+
+    ggtitle(srdmr.type)+
+    theme_bw()
+  p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
+  p
+}
+p1<-plot.scdmr.status('Early-Hyper-DMR')
+p2<-plot.scdmr.status('Early-Hypo-DMR')
+p3<-plot.scdmr.status('Late-Hyper-DMR')
+p4<-plot.scdmr.status('Late-Hypo-DMR')
+saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 6,height = 6)
+grid.arrange(p1, p2,p3,p4, nrow = 2)
+dev.off()
+srdmr.status<-sapply(SRDMR.list, function(x){
+  out<-c(mean(x$cpg),mean(x$length))
+  names(out)<-c('Average CpG Number', 'Average Size')
+  out
+})
+srdmr.status<-data.frame(srdmr.status)
+write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
 # Table S9. SR-DMR Homer
 #----------------------------------------------------------------------------------------------------------------------

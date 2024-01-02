@@ -3,6 +3,8 @@ library(ChIPseeker)
 library(DESeq2)
 library(reshape2)
 library(ggplot2)
+library(ggExtra)
+library(gridExtra)
 library(circlize)
 library(GenomicRanges)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
@@ -274,7 +276,42 @@ saveImage2("dar.great.IAC.hypo.BP.pdf",width = 4,height = 1.2)
 plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hypo.great.GOBiologicalProcess.tsv"),title="")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR Homer
+# Figure S2A. ATAC-seq: DAR Homer Figure. heatmap
+#----------------------------------------------------------------------------------------------------------------------
+atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'))
+atacPeakTPMFeatures<-bed2Feature(atacPeakTPM)
+darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
+plot.dar.status<-function(dar,dar.type){
+  SRDMR.list<-split(SRDMR,SRDMR$class)
+
+  features<-rownames(dar)
+  bed<-feature2Bed(features)
+  tpmSelect<-atacPeakTPM[match(features, atacPeakTPMFeatures),]
+  tpm<-groups$WGBS.ATAC$pickColumnsByGroup(c('IAC'), tpmSelect)
+  data<-data.frame(
+    x=bed$end - bed$start,
+    y=dar$log2FoldChange
+  )
+  p_scatter <- ggplot(data, aes(x = x, y = y)) +
+    geom_point(size=0.3,alpha = 0.6) +
+    xlab("DARs size (bp)")+
+    ylab("Log2FoldChange of DARs")+
+    ggtitle(dar.type)+
+    theme_bw()
+  p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
+  p
+}
+p1<-plot.dar.status(darDeseq2$darCTLvsAIS$hyper, 'HyperDARs In AIS')
+p2<-plot.dar.status(darDeseq2$darCTLvsAIS$hypo, 'HypoDARs In AIS')
+p3<-plot.dar.status(darDeseq2$darCTLvsMIA$hyper, 'HyperDARs In MIA')
+p4<-plot.dar.status(darDeseq2$darCTLvsMIA$hypo, 'HypoDARs In MIA')
+p5<-plot.dar.status(darDeseq2$darCTLvsIAC$hyper, 'HyperDARs In IAC')
+p6<-plot.dar.status(darDeseq2$darCTLvsIAC$hypo, 'HypoDARs In IAC')
+saveImage2("dar.status.scatter.logfc.length.pdf",width = 6,height = 9)
+grid.arrange(p1, p2,p3,p4, p5,p6,nrow = 3)
+dev.off()
+#----------------------------------------------------------------------------------------------------------------------
+# Table S11. ATAC-seq: DAR Homer
 #----------------------------------------------------------------------------------------------------------------------
 homerAISHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hyper'))
 homerAISHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hypo'))
@@ -301,7 +338,7 @@ motifTable<-data.frame(Motifs=motifWidthData$motif,
                        motifWidthData[,3:ncol(motifWidthData)])
 write.csv(motifTable, file.path(CONFIG$dataResult, 'atac.dar.homer.motifs.csv'),row.names  = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR Homer Figure. heatmap
+# Figure S2B. ATAC-seq: DAR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------
 tfWidthData.2<-data.frame(tfWidthData[,1:2],AISHyperDARs=0 ,tfWidthData[3:ncol(tfWidthData)])
 
@@ -331,7 +368,7 @@ Heatmap(m,
 )
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# ATAC-seq: DAR Homer Figure. heatmap count
+# Figure S2C. ATAC-seq: DAR Homer Figure. heatmap count
 #----------------------------------------------------------------------------------------------------------------------
 data<-tfWidthData.2[2:ncol(tfWidthData.2)]
 mat<-sapply(names(data), function(x){
