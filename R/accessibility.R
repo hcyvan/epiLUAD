@@ -233,27 +233,6 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 3E,F. GREAT analysis of DMRs
 #----------------------------------------------------------------------------------------------------------------------
-plot.great<-function(tsv,title="") {
-  enrich<-loadData2(tsv, comment.char = "#",header=FALSE)
-  enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
-  colnames(enrich)<-enrich.col
-  data<-data.frame(x=enrich$TermName,y=-log10(enrich$BinomFDRQVal))
-  data<-data[order(data$y),]
-  ggplot(data, aes(x=x, y=y))+
-    geom_bar(stat="identity", width=0.3, fill='black')+
-    coord_flip()+
-    scale_x_discrete(limits=data$x,labels = NULL )+
-    theme_classic()+
-    theme(legend.position="none")+
-    scale_y_continuous(expand = c(0,0))+
-    annotate("text", x=seq(1, nrow(data))+0.4, y=0,
-             hjust = 0, cex=3,
-             label= data$x)+
-    labs(x="", y="-Log10(q-value)",title=title)+
-    theme( axis.ticks.y = element_blank(),
-           axis.line.y = element_blank(),
-           axis.text.y = element_blank())
-}
 saveImage2("dar.great.AIS.hypo.BP.pdf",width = 4,height = 4)
 plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.AIS.hypo.great.GOBiologicalProcess.tsv"),title="")
 dev.off()

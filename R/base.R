@@ -3,6 +3,7 @@ library(yaml)
 library(tools)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
+library(ggplot2)
 
 configDefaultPath <- './config.default.yaml'
 configPath <- './config.yaml'
@@ -42,9 +43,21 @@ ensemble2Symbol2<-function(ensemble){
   names(symbols)<-genes_info$ensembl_gene_id
   symbols
 }
-ensemble2Symbol3<-function(ensemble){
+ensemble2Symbol3<-function(ensemble,keepIfNotMatch=FALSE){
   ensembl2symbolMap<-readRDS(file.path(CONFIG$dataIntermediate, 'ensembl2symbolMap.rds'))
-  ensembl2symbolMap[match(ensemble,names(ensembl2symbolMap))]
+  df<-data.frame(
+    a=ensemble,
+    b=ensembl2symbolMap[match(ensemble,names(ensembl2symbolMap))]
+  )
+  sapply(1:nrow(df),function(i){
+    if (is.na(df[i,2])){
+      ifelse(keepIfNotMatch, df[i,1], "")
+    }else if (nchar(df[i,2])==0) {
+      ifelse(keepIfNotMatch, df[i,1], "")
+    }else {
+      df[i,2]
+    }
+  })
 }
 
 homerKnownTFs<-function(dir){
@@ -161,6 +174,31 @@ loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE
       data
     }
   }
+}
+########################################### plot function ###########################################
+plotEnrich<-function(term, qval,title=""){
+  data<-data.frame(x=term,y=-log10(qval))
+  data<-data[order(data$y),]
+  ggplot(data, aes(x=x, y=y))+
+    geom_bar(stat="identity", width=0.3, fill='black')+
+    coord_flip()+
+    scale_x_discrete(limits=data$x,labels = NULL )+
+    theme_classic()+
+    theme(legend.position="none")+
+    scale_y_continuous(expand = c(0,0))+
+    annotate("text", x=seq(1, nrow(data))+0.4, y=0,
+             hjust = 0, cex=3,
+             label= data$x)+
+    labs(x="", y="-Log10(q-value)",title=title)+
+    theme( axis.ticks.y = element_blank(),
+           axis.line.y = element_blank(),
+           axis.text.y = element_blank())
+}
+plot.great<-function(tsv,title="") {
+  enrich<-loadData2(tsv, comment.char = "#", header=FALSE)
+  enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
+  colnames(enrich)<-enrich.col
+  plotEnrich(enrich$TermName, enrich$BinomFDRQVal, title)
 }
 
 ############################################################################################

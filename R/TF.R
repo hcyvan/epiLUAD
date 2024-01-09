@@ -7,7 +7,7 @@ library(VennDiagram)
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 4A. Common DARs and SC-DMRs Homer TFs
+# Figure 3G. Common DARs and SC-DMRs Homer TFs
 #----------------------------------------------------------------------------------------------------------------------
 motifDAR<-read.csv(file.path(CONFIG$dataResult, 'atac.dar.homer.motifs.csv'))
 motifSRDMR<-read.csv(file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'))
@@ -26,7 +26,38 @@ venn.plot<-venn.diagram(x = list(DAR = darHomerTFs, `SR-DMR` = srdmrHomerTFs),
 saveImage2("tf124.venn.pdf",width = 4,height = 4)
 grid.draw(venn.plot)
 dev.off()
-
+#----------------------------------------------------------------------------------------------------------------------
+# Get gene symbol of 124 TFs
+#----------------------------------------------------------------------------------------------------------------------
+tf124<-loadData2(file.path(CONFIG$dataIntermediate,'tf', 'tf124.txt'),file.format = 'bed',header = FALSE)$V1
+tf<-tf124
+tf<-toupper(tf)
+tf<-gsub('-FUSION',"",tf)
+tf<-gsub('-HALFSITE',"",tf)
+tf<-gsub('-DISTAL',"",tf)
+tfname<-c('PU.1','NKX2.1','NKX2.2','NKX2.5','NKX3.1','NKX6.1','BAPX1','FRA1','FRA2','TLX?', 'CHOP','E2A','HNF1','NF-E2','NRF2','P53','P63','P73','SNAIL1','SLUG','EWS')
+genename<-c('SPI1','NKX2-1','NKX2-2','NKX2-5','NKX3-1','NKX6-1','NKX3-2','FOSL1','FOSL2','NR2E1', 'DDIT3','TCF3','HNF1A','NFE2','NFE2L2','TP53','TP63','TP73','SNAI1','SNAI2','EWSR1')
+tfname2<-c('C-JUN-CRE','EWS:ERG','EWS:FLI1','JUN-AP1','NF1:FOXA1','PU.1-IRF')
+genename2<-c('JUN','ERG','FLI1','JUN','NF1','SPI1')
+tfname<-c(tfname,tfname2)
+genename<-c(genename,genename2)
+genenameRemove<-c('AP-1','CRE','EKLF', 'ETS', 'RUNX', 'FOX', 'HEB', 'TEAD', 'ZFP809','ETS:RUNX','FOX:EBOX','RUNX-AML')
+tfgene<-data.frame(tf=tf,gene=genename[match(tf, tfname)])
+gene<-sapply(1:nrow(tfgene), function(i){
+  t<-tfgene[i,1]
+  g<-tfgene[i,2]
+  if(is.na(g)) {
+   if (t%in%genenameRemove) {
+      NA
+   }else{
+     t
+   }
+  } else{
+    g
+  }
+})
+tfgene<-data.frame(tf=tf124, gene=gene)
+write.csv(tfgene, file.path(CONFIG$dataResult, 'tf124.symbol.csv'),row.names = FALSE,quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
 # Common DARs and SC-DMRs Homer TFs
 #----------------------------------------------------------------------------------------------------------------------
@@ -43,7 +74,7 @@ allMotifFilter<-allMotifFilter[allMotifFilter$PositionID%in%diffPeak,]
 tf124Motif<-allMotifFilter[sapply(strsplit(allMotifFilter$`Motif Name`, '\\('),function(x){x[1]})%in%tf124,]
 saveRDS(tf124Motif,file.path(CONFIG$dataIntermediate, 'atac','homer.mask','all.motif.124.dar.rds'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 4B. 124 TFs cluster
+# Figure 3H. 124 TFs cluster
 #----------------------------------------------------------------------------------------------------------------------
 allMotif<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','all.motif.124.dar.rds'))
 allMotifList<-split(allMotif, allMotif$`Motif Name`)
@@ -94,7 +125,7 @@ rownames(m)<-sapply(strsplit(motifs,'\\('),function(x){x[1]})
 
 myDist <- function(x) dist(x, method = "euclidean")
 myHclust <- function(x) hclust(x, method = "ward.D2")
-saveImage2("tf.124.heatmap.pdf",width = 9,height = 8)
+saveImage2("tf124.heatmap.pdf",width = 9,height = 8)
 Heatmap(m,
         name='-log10(FDR)',
         column_names_gp = grid::gpar(fontsize = 4),
