@@ -33,7 +33,7 @@ plotBarTPM<-function(geneSymbol){
   rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
   symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
   gene<-unlist(rnaTPM[match(geneSymbol, symbol),][-1])
-  samples<-groups$RNA$selectBySample(names(exp))
+  samples<-groups$RNA$selectBySample(names(gene))
   data<-data.frame(
     stage=samples$Group,
     value=gene
@@ -189,7 +189,7 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S3E Expression of 24 significant differential expression TFs
 #----------------------------------------------------------------------------------------------------------------------
-tf124gene<-loadData2(file.path(CONFIG$dataResult,'tf124.symbol.csv'))
+tf124gene<-loadData2(file.path(CONFIG$dataResult,'tf.epTFs.csv'))
 deg<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.rds'))
 tf124<-loadData2(file.path(CONFIG$dataIntermediate,'tf', 'tf124.txt'),file.format = 'bed',header = FALSE)$V1
 geneTf124<-na.omit(unique(tf124gene$gene))
@@ -309,8 +309,8 @@ plot.clusterprofiler(goIAC$mf)
 deg<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.rds'))
 rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
 symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
-tf124gene<-loadData2(file.path(CONFIG$dataResult,'tf124.symbol.csv'))
-geneTf124<-na.omit(unique(tf124gene$gene))
+epiTfs <- loadData2(file.path(CONFIG$dataIntermediate, 'tf','tf.epTFs.csv'))
+geneTf124<-na.omit(unique(epiTfs$gene))
 genes<-c()
 genes<-unique(c(genes, unlist(sapply(deg, function(x){x$genes}))))
 genes<-unique(c(genes, geneTf124))
@@ -323,12 +323,15 @@ cor(t(mm))->a
 a[lower.tri(a)]<-1
 df0<-melt(a)
 df0<-filter(df0, value<1)
-df<-filter(df0,abs(value)>=0.7)
-df<-df[(df$Var1%in%geneTf124|df$Var2%in%geneTf124),]
-df$Var1<-as.vector(df$Var1)
-df$Var2<-as.vector(df$Var2)
-df$tf<-ifelse(df$Var1%in%geneTf124, df$Var1, df$Var2)
-df$gene<-ifelse(df$Var1%in%geneTf124, df$Var2, df$Var1)
+
+tfDEG<-df0[(df0$Var1%in%geneTf124|df0$Var2%in%geneTf124),]
+tfDEG$Var1<-as.vector(tfDEG$Var1)
+tfDEG$Var2<-as.vector(tfDEG$Var2)
+tfDEG$tf<-ifelse(tfDEG$Var1%in%geneTf124, tfDEG$Var1, tfDEG$Var2)
+tfDEG$gene<-ifelse(tfDEG$Var1%in%geneTf124, tfDEG$Var2, tfDEG$Var1)
+tfDEG<-dplyr::select(tfDEG, tf, gene, value)
+saveRDS(tfDEG,file.path(CONFIG$dataIntermediate, 'tf','tf.epiTFs.deg.cor.rds'))
+df<-filter(tfDEG,abs(value)>=0.7)
 tfCorNumber<-sapply(split(df, df$tf),function(x){
   nrow(x)
 })
@@ -456,29 +459,5 @@ cor(t(mm))
 # plot(a,b)
 #######################
 
-
-
-geneList<-c('EGFR','IL1R2','BRAF','PDCD1','CD274')
-rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
-symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
-keep<-match(geneList, symbol)[!is.na(match(geneList, symbol))]
-tfs<-rnaTPM[keep,]
-m<-as.matrix(tfs[,-1])
-rownames(m)<-symbol[keep]
-mm<-m
-samples<-groups$RNA$selectBySample(colnames(mm))
-mmSingle<-lapply(1:nrow(mm), function(i){
-  data.frame(
-    value=mm[i,],
-    stage=samples$Group
-  )
-})
-names(mmSingle)<-rownames(mm)
-
-plotBarTPM(mmSingle$EGFR, 'EGFR')
-plotBarTPM(mmSingle$IL1R2, 'IL1R2')
-plotBarTPM(mmSingle$BRAF, 'BRAF')
-plotBarTPM(mmSingle$PDCD1, 'PDCD1')
-plotBarTPM(mmSingle$CD274, 'CD274')
-
+plotBarTPM('JUN')# no;;target
 
