@@ -60,14 +60,91 @@ ensemble2Symbol3<-function(ensemble,keepIfNotMatch=FALSE){
   })
 }
 
-homerKnownTFs<-function(dir){
+homerKnownTFs<-function(dir,stage='LUAD',cutoff=0.001){
   result.txt<-file.path(dir,'knownResults.txt')
   result<-read.csv(result.txt,sep='\t')
   result<-result[result$q.value..Benjamini.< 0.02,]
-  result
-  sapply(result$Motif.Name, function(x){
+  result<-filter(result, q.value..Benjamini.<=cutoff)
+  homer<-sapply(result$Motif.Name, function(x){
     c(strsplit(x,"\\(")[[1]][1])
   })
+  out<-data.frame(tf=homer, motif=names(homer),class=stage)
+  rownames(out)<-NULL
+  out
+}
+
+
+fixHomerTFs<-function(tf0){
+  tf<-toupper(tf0)
+  for (s in c('-FUSION','-HALFSITE', '-DISTAL',':EBOX', ':E-BOX','-AML')){
+    tf<-gsub(s,"",tf)
+  }
+  tfDimerMap<-c(
+    "JUN-AP1"='JUN',
+    'C-JUN-CRE'='JUN',
+    'EWS:ERG'='ERG',
+    'EWS:FLI1'='FLI1',
+    'NF1:FOXA1'='NF1',
+    'PU.1-IRF'='PU.1',
+    'PU.1:IRF8'='IRF8',
+    'ARNT:AHR'='AHR',
+    'ETS:RUNX'='ETS'
+  )
+  tfMap<-c(
+    'PU.1'='SPI1',
+    'NKX2.1'='NKX2-1',
+    'NKX2.2'='NKX2-2',
+    'NKX2.5'='NKX2-5',
+    'NKX3.1'='NKX3-1',
+    'NKX6.1'='NKX6-1',
+    'BAPX1'='NKX3-2',
+    'FRA1'='FOSL1',
+    'FRA2'='FOSL2',
+    'TLX?'='NR2E1',
+    'CHOP'='DDIT3',
+    'E2A'='TCF3',
+    'HNF1'='HNF1A',
+    'NF-E2'='NFE2',
+    'NRF2'='NFE2L2',
+    'P53'='TP53',
+    'P63'='TP63',
+    'P73'='TP73',
+    'SNAIL1'='SNAI1',
+    'SLUG'='SNAI2',
+    'EWS'='EWSR1',
+    'EKLF'='KLF1',
+    'AP-2GAMMA'='TFAP2C',
+    'AP-2ALPHA'='TFAP2A',
+    'HIF-1B'='ARNT'
+  )
+  tfRemove<-c('AP-1','CRE', 'ETS', 'RUNX', 'FOX', 'HEB', 'TEAD', 'ZFP809','ETS:RUNX','FOX:EBOX','RUNX-AML')
+  tf<-sapply(tf, function(x){
+    ifelse(x%in%names(tfDimerMap), tfDimerMap[match(x, names(tfDimerMap))],x)
+  })
+  tf<-sapply(tf, function(x){
+    ifelse(x%in%names(tfMap), tfMap[match(x, names(tfMap))],x)
+  })
+  tf<-sapply(tf, function(x){
+    ifelse(x%in%tfRemove, NA,x)
+  })
+  tf
+}
+
+getSRTFS<-function(tfs){
+  tfGeneMotif<-data.frame(gene=fixHomerTFs(tfs$tf),tf=tfs$tf,motif=tfs$motif)
+  tfGeneMotif<-filter(tfGeneMotif,!is.na(gene))%>%distinct(gene,tf,motif)
+  statusStage<-c("HyperInAIS","HypoInAIS", "HyperInMIA","HypoInMIA", "HyperInIAC", "HypoInIAC")
+  tfStage<-sapply(split(tfGeneMotif, tfGeneMotif$gene), function(x){
+    data<-left_join(x, tfs, by='motif')
+    ifelse(statusStage%in%data$class,1,0)
+  })%>%t%>%data.frame()
+  colnames(tfStage)<-statusStage
+  srTFs<-list(
+    tf=rownames(tfStage),
+    map=tfGeneMotif,
+    stage=tfStage
+  )
+  srTFs
 }
 
 feature2Bed<-function(feature) {
@@ -194,13 +271,14 @@ plotEnrich<-function(term, qval,title=""){
            axis.line.y = element_blank(),
            axis.text.y = element_blank())
 }
-plot.great<-function(tsv,title="") {
+plot.great<-function(tsv,cutoff=0.01,title="") {
   enrich<-loadData2(tsv, comment.char = "#", header=FALSE)
   enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
   colnames(enrich)<-enrich.col
+  enrich<-enrich[,-ncol(enrich)]
+  enrich<-filter(enrich, BinomFDRQVal<=cutoff)
   plotEnrich(enrich$TermName, enrich$BinomFDRQVal, title)
 }
-
 ############################################################################################
 chromFactorLevel<-c('chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14',
      'chr15','chr16','chr17','chr18','chr19','chr20','chr21','chr22','chrX','chrY')
@@ -210,16 +288,20 @@ gonomicRegionFactorLevel<-c('cgIslands', 'cgShores', 'cgShelves', 'cgSea',
 # stageColor<-c("#31a354", "#addd8e", "#fd8d3c", "#e31a1c")
 colorMapDAR <- c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd")
 names(colorMapDAR)<-c('AISHypoDARs','AISHyperDARs','MIAHypoDARs','MIAHyperDARs','IACHypoDARs','IACHyperDARs')
-colorMapSRDMR<-c("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd")
-names(colorMapSRDMR)<-c('Early-Hyper-DMR','Early-Hypo-DMR','Late-Hyper-DMR','Late-Hypo-DMR')
+colorMapGroup<-c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd")
+names(colorMapGroup)<-c('HypoInAIS','HyperInAIS','HypoInIMA','HyperInMIA','HypoInIAC','HyperInIAC')
 colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')
 names(colorMapStage)<-groupFactorLevel
 
 loadSRDMR<-function(){
-  SRDMR<-loadData2(file.path(CONFIG$dataIntermediate, 'srdmr.s2.bed'),header = FALSE)
+  SRDMR<-loadData2(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.bed'),header = FALSE)
   colnames(SRDMR)<-c('chrom','start', 'end', 'class','cpg','length')
-  SRDMR$class<-sub('DMC','DMR',SRDMR$class)
   SRDMR
+}
+loadSRDAR<-function(){
+  SRDAR<-loadData2(file.path(CONFIG$dataIntermediate,'atac', 'srdar.bed'),header = FALSE)
+  colnames(SRDAR)<-c('chrom','start', 'end', 'class')
+  SRDAR 
 }
 #############################################################################################
 Group <- setRefClass(
@@ -294,6 +376,12 @@ saveImage2 <- function(file,...){
   }
 }
 
+saveTsv<-function(data, filename,col.names = TRUE) {
+  write.table(data, filename, quote = FALSE, sep = "\t", row.names = FALSE,col.names=col.names)
+}
+saveCsv<-function(data, filename) {
+  write.csv(data, filename, quote = FALSE, row.names = FALSE)
+}
 ################################################################################################
 groups <- getGroups()
 

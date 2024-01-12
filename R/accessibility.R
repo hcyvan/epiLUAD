@@ -70,27 +70,17 @@ darDeseq2<-list(
   darCTLvsIAC=darCTLvsIAC
 )
 saveRDS(darDeseq2, file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
-saveDAR<-function(dar,hypo.file,hyper.file) {
-  hypo<-dar$hypo
-  hyper<-dar$hyper
-  cat(sprintf("hypo: %d; hyper: %d\n", dim(hypo)[1], dim(hyper)[1]))
-  write.table(data.frame(feature2Bed(rownames(hypo)),hypo), file.path(CONFIG$dataIntermediate,'atac', hypo.file), sep='\t', row.names = FALSE, col.names = FALSE,quote = FALSE)
-  write.table(data.frame(feature2Bed(rownames(hyper)),hyper), file.path(CONFIG$dataIntermediate,'atac', hyper.file), sep='\t', row.names = FALSE, col.names = FALSE,quote = FALSE)
-}
-saveDAR(darDeseq2$darCTLvsAIS,'dar.p400.AIS.hypo.bed','dar.p400.AIS.hyper.bed')
-saveDAR(darDeseq2$darCTLvsMIA,'dar.p400.MIA.hypo.bed','dar.p400.MIA.hyper.bed')
-saveDAR(darDeseq2$darCTLvsIAC,'dar.p400.IAC.hypo.bed','dar.p400.IAC.hyper.bed')
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3B. ATAC-seq: DAR numbers and Upset plot
+# Figure 3B. DAR numbers and Upset plot
 #----------------------------------------------------------------------------------------------------------------------
 darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 dar<-list(
-  AISHyperDARs=rownames(darDeseq2$darCTLvsAIS$hyper),
-  AISHypoDARs=rownames(darDeseq2$darCTLvsAIS$hypo),
-  MIAHyperDARs=rownames(darDeseq2$darCTLvsMIA$hyper),
-  MIAHypoDARs=rownames(darDeseq2$darCTLvsMIA$hypo),
-  IACHyperDARs=rownames(darDeseq2$darCTLvsIAC$hyper),
-  IACHypoDARs=rownames(darDeseq2$darCTLvsIAC$hypo)
+  AISHyper=rownames(darDeseq2$darCTLvsAIS$hyper),
+  AISHypo=rownames(darDeseq2$darCTLvsAIS$hypo),
+  MIAHyper=rownames(darDeseq2$darCTLvsMIA$hyper),
+  MIAHypo=rownames(darDeseq2$darCTLvsMIA$hypo),
+  IACHyper=rownames(darDeseq2$darCTLvsIAC$hyper),
+  IACHypo=rownames(darDeseq2$darCTLvsIAC$hypo)
 )
 sapply(names(dar), function(x){
   sapply(names(dar), function(y){
@@ -99,30 +89,137 @@ sapply(names(dar), function(x){
 })
 darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 m = make_comb_mat(dar)
-setOrder=c("AISHyperDARs", "AISHypoDARs", "MIAHyperDARs", "MIAHypoDARs","IACHyperDARs", "IACHypoDARs")
-saveImage2("atac.dar.upset.pdf",width = 6,height = 4)
+setOrder=c("AISHyper", "AISHypo", "MIAHyper", "MIAHypo","IACHyper", "IACHypo")
+saveImage2("atac.dar.upset.pdf",width = 4,height = 3)
 UpSet(m, set_order = setOrder, comb_order = order(-comb_size(m)))
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3C. ATAC-seq: DAR Density near TSS and CGI
+# SRDAR
+#----------------------------------------------------------------------------------------------------------------------
+darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
+extractDar<-function(diff,group){
+  data.frame(
+    feature2Bed(rownames(diff)),
+    class=ifelse(diff$log2FoldChange>0,'Hyper','Hypo'),
+    group=group
+  )
+}
+lData<-Reduce(rbind,list(
+  AIS=extractDar(darDeseq2$darCTLvsAIS$diff,'AIS'),
+  MIA=extractDar(darDeseq2$darCTLvsMIA$diff,'MIA'),
+  IAC=extractDar(darDeseq2$darCTLvsIAC$diff,'IAC')
+))
+srdar<-dcast(lData,chrom + start+ end ~ group,value.var = 'class')
+srdar[,4:6][is.na(srdar[,4:6])] <- "NC"
+
+HyperInAIS<-Reduce(rbind,list(
+  filter(srdar,AIS=='Hyper',MIA=="Hyper", IAC=="Hyper"),
+  filter(srdar,AIS=='Hyper',MIA=="Hyper", IAC=="NC"),
+  filter(srdar,AIS=='Hyper',MIA=="NC", IAC=="NC")
+))%>%mutate(class='HyperInAIS')%>%dplyr::select(chrom, start,end,class)
+HyperInMIA<-Reduce(rbind,list(
+  filter(srdar,AIS=='NC',MIA=="Hyper", IAC=="NC"),
+  filter(srdar,AIS=='NC',MIA=="Hyper", IAC=="Hyper")
+))%>%mutate(class='HyperInMIA')%>%dplyr::select(chrom, start,end,class)
+HyperInIAC<-Reduce(rbind,list(
+  filter(srdar,AIS=='NC',MIA=="NC", IAC=="Hyper")
+))%>%mutate(class='HyperInIAC')%>%dplyr::select(chrom, start,end,class)
+HypoInAIS<-Reduce(rbind,list(
+  filter(srdar,AIS=='Hypo',MIA=="Hypo", IAC=="Hypo"),
+  filter(srdar,AIS=='Hypo',MIA=="Hypo", IAC=="NC"),
+  filter(srdar,AIS=='Hypo',MIA=="NC", IAC=="NC")
+))%>%mutate(class='HypoInAIS')%>%dplyr::select(chrom, start,end,class)
+HypoInMIA<-Reduce(rbind,list(
+  filter(srdar,AIS=='NC',MIA=="Hypo", IAC=="NC"),
+  filter(srdar,AIS=='NC',MIA=="Hypo", IAC=="Hypo")
+))%>%mutate(class='HypoInMIA')%>%dplyr::select(chrom, start,end,class)
+HypoInIAC<-Reduce(rbind,list(
+  filter(srdar,AIS=='NC',MIA=="NC", IAC=="Hypo")
+))%>%mutate(class='HypoInIAC')%>%dplyr::select(chrom, start,end,class)
+SRDAR<-Reduce(rbind,list(
+  HyperInAIS=HyperInAIS,
+  HyperInMIA=HyperInMIA,
+  HyperInIAC=HyperInIAC,
+  HypoInAIS=HypoInAIS,
+  HypoInMIA=HypoInMIA,
+  HypoInIAC=HypoInIAC
+))
+SRDAR$chrom <- factor(SRDAR$chrom, levels=chromFactorLevel)
+SRDAR<-arrange(SRDAR, chrom, start)
+srdar.count<-dplyr::count(srdar,AIS,IAC,MIA)%>%dplyr::select(AIS, MIA, IAC, n)%>%arrange(AIS, MIA, IAC)
+SRDAR.count<-dplyr::count(SRDAR, class)%>%arrange(desc(n))
+saveTsv(SRDAR, file.path(CONFIG$dataIntermediate, 'atac','srdar.bed'),col.names=FALSE)
+saveTsv(filter(SRDAR,class=='HyperInAIS')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HyperInAIS.bed'),col.names = FALSE)
+saveTsv(filter(SRDAR,class=='HypoInAIS')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HypoInAIS.bed'),col.names = FALSE)
+saveTsv(filter(SRDAR,class=='HyperInMIA')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HyperInMIA.bed'),col.names = FALSE)
+saveTsv(filter(SRDAR,class=='HypoInMIA')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HypoInMIA.bed'),col.names = FALSE)
+saveTsv(filter(SRDAR,class=='HyperInIAC')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HyperInIAC.bed'),col.names = FALSE)
+saveTsv(filter(SRDAR,class=='HypoInIAC')[,1:3], file.path(CONFIG$dataIntermediate, 'atac','srdar.HypoInIAC.bed'),col.names = FALSE)
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 3C-E. SRDAR heatmap
+#----------------------------------------------------------------------------------------------------------------------
+SRDAR<-loadSRDAR()
+atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'))
+dar<-split(SRDAR,SRDAR$class)
+plot.srdar<-function(region){
+  data<-atacPeakTPM[match(bed2Feature(region),bed2Feature(atacPeakTPM)),-(1:3)]
+  samples<-groups$ATAC$selectBySample(colnames(data))
+  column_annotation <-HeatmapAnnotation(
+    df=data.frame(Stage=samples$Group),
+    col = list(Stage =colorMapStage),
+    show_annotation_name =FALSE,
+    annotation_name_side='left'
+  )
+  m1<-data
+  nrow1<-nrow(m1)
+  if (nrow(m1) >=1000){
+    set.seed(123)
+    m1<-m1[sample(1:nrow(m1),1000),]
+  }
+  nrow2<-nrow(m1)
+  print(sprintf("%d => %d", nrow1, nrow2))
+  Heatmap(t(scale(t(m1))),
+          top_annotation = column_annotation,
+          cluster_rows=TRUE,
+          cluster_columns = FALSE,
+          show_row_names=FALSE,
+          show_column_names=FALSE,
+          heatmap_legend_param = list(
+            title = "Scaled Accessibility",
+            legend_height = unit(4, "cm"),
+            at = c(0,0.5,1),
+            labels = c('0','0.5','1'),
+            title_position = "lefttop-rot"
+          ),
+  )
+}
+saveImage2("atac.srdar.heatmap.HyperInAIS.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HyperInAIS)
+dev.off()
+saveImage2("atac.srdar.heatmap.HypoInAIS.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HypoInAIS)
+dev.off()
+saveImage2("atac.srdar.heatmap.HyperInMIA.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HyperInMIA)
+dev.off()
+saveImage2("atac.srdar.heatmap.HypoInMIA.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HypoInMIA)
+dev.off()
+saveImage2("atac.srdar.heatmap.HyperInIAC.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HyperInIAC)
+dev.off()
+saveImage2("atac.srdar.heatmap.HypoInIAC.pdf",width = 3.5,height = 2)
+plot.srdar(dar$HypoInIAC)
+dev.off()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Figure 3F. SRDAR Density near TSS and CGI
 #----------------------------------------------------------------------------------------------------------------------
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 cgIslands.gr<-genomicRegion$cgIslands
 tss.gr<-genomicRegion$tss
-darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
-dar<-list(
-  AISHyperDARs=rownames(darDeseq2$darCTLvsAIS$hyper),
-  AISHypoDARs=rownames(darDeseq2$darCTLvsAIS$hypo),
-  MIAHyperDARs=rownames(darDeseq2$darCTLvsMIA$hyper),
-  MIAHypoDARs=rownames(darDeseq2$darCTLvsMIA$hypo),
-  IACHyperDARs=rownames(darDeseq2$darCTLvsIAC$hyper),
-  IACHypoDARs=rownames(darDeseq2$darCTLvsIAC$hypo)
-)
-
-DAR<-do.call(rbind,lapply(names(dar), function(x){
-  data.frame(feature2Bed(dar[[x]]),class=x)
-}))
-
+SRDAR<-loadSRDAR()
+DAR<-split(SRDAR,SRDAR$class)
 annoDistQueryToSubject<-function(query, subject){
   midpoint<-function(gr){
     mid<-floor((start(gr) + end(gr)) / 2)
@@ -138,8 +235,8 @@ annoDistQueryToSubject<-function(query, subject){
   query.hits$distanceToSubject<-mcols(hits)$distance * dist.sign
   query.hits
 }
-distToCGI<-annoDistQueryToSubject(bed2GRanges(DAR),cgIslands.gr)
-distToTSS<-annoDistQueryToSubject(bed2GRanges(DAR),tss.gr)
+distToCGI<-annoDistQueryToSubject(bed2GRanges(SRDAR),cgIslands.gr)
+distToTSS<-annoDistQueryToSubject(bed2GRanges(SRDAR),tss.gr)
 
 set.seed(123)
 lim<-50000
@@ -175,31 +272,23 @@ plot.dar.density.tss.vs.cgi<-function(g) {
   legend("topleft", legend=names(colorMap), fill=colorMap, bty = "n")
 }
 
-saveImage2("atac.dar.density.genomicRegion.pdf",width = 5,height = 6)
+saveImage2("atac.dar.density.genomicRegion.pdf",width = 4,height = 6.5)
 par(mfrow = c(3,2))
-plot.dar.density.tss.vs.cgi('AISHyperDARs')
-plot.dar.density.tss.vs.cgi('AISHypoDARs')
-plot.dar.density.tss.vs.cgi('MIAHyperDARs')
-plot.dar.density.tss.vs.cgi('MIAHypoDARs')
-plot.dar.density.tss.vs.cgi('IACHyperDARs')
-plot.dar.density.tss.vs.cgi('IACHypoDARs')
+plot.dar.density.tss.vs.cgi('HyperInAIS')
+plot.dar.density.tss.vs.cgi('HypoInAIS')
+plot.dar.density.tss.vs.cgi('HyperInMIA')
+plot.dar.density.tss.vs.cgi('HypoInMIA')
+plot.dar.density.tss.vs.cgi('HyperInIAC')
+plot.dar.density.tss.vs.cgi('HypoInIAC')
 dev.off()
-
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3D. ATAC-seq: DAR in genomic regions
+# SRDAR in genomic regions
 #----------------------------------------------------------------------------------------------------------------------
-darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
-DAR<-list(
-  AISHyperDARs=rownames(darDeseq2$darCTLvsAIS$hyper),
-  AISHypoDARs=rownames(darDeseq2$darCTLvsAIS$hypo),
-  MIAHyperDARs=rownames(darDeseq2$darCTLvsMIA$hyper),
-  MIAHypoDARs=rownames(darDeseq2$darCTLvsMIA$hypo),
-  IACHyperDARs=rownames(darDeseq2$darCTLvsIAC$hyper),
-  IACHypoDARs=rownames(darDeseq2$darCTLvsIAC$hypo)
-)
+SRDAR<-loadSRDAR()
+DAR<-split(SRDAR, SRDAR$class)
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 DAR.genomicRegion<-sapply(names(DAR),function(x){
-  gr2<-bed2GRanges(feature2Bed(DAR[[x]]))
+  gr2<-bed2GRanges(DAR[[x]])
   sapply(genomicRegion, function(gr1){
     sum(countOverlaps(gr2, gr1)!=0)
   })
@@ -209,13 +298,10 @@ plot.dar.barplot.genomicRegion <- function(regions){
   allRegion$region<-rownames(allRegion)
   allRegion$region<-factor(regions[match(allRegion$region,names(regions))],levels = regions)
   allRegion<-allRegion[!is.na(allRegion$region),]
-  # print(allRegion)
-  # allRegion[,1:6]<-log2(allRegion[,1:6]+1)
-  # print(allRegion)
   df<-melt(allRegion,variable.name='Stage')
-  print(df)
+  df$Stage<-factor(as.vector(df$Stage), levels=names(colorMapGroup))
   ggplot(data=df, aes(y=value, x=region, fill=Stage))+
-    scale_fill_manual(values=colorMapDAR)+
+    scale_fill_manual(values=colorMapGroup)+
     geom_bar(stat="identity", position=position_dodge())+
     ylab("DARs Number")+
     xlab("Genomic Regions")+
@@ -229,30 +315,14 @@ saveImage2("atac.dar.barplot.genomicRegion.promoter.pdf",width = 8,height = 2.5)
 regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'UTR", 'utr3'="3'UTR",'exons'='Exons','intron'='Intron','intergenic'='Intergenic')
 plot.dar.barplot.genomicRegion(regions)
 dev.off()
-# write.csv(data.frame(t(DAR.genomicRegion)), file.path(CONFIG$dataResult, 'atac.dar.count.genomicRegion.csv'), quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3E,F. GREAT analysis of DMRs
+# Figure 3G,H. GREAT analysis of SRDARs
 #----------------------------------------------------------------------------------------------------------------------
-saveImage2("dar.great.AIS.hypo.BP.pdf",width = 4,height = 4)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.AIS.hypo.great.GOBiologicalProcess.tsv"),title="")
+saveImage2("dar.great.AIS.hypo.BP.pdf",width = 4,height = 3)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HypoInAIS.GOBiologicalProcess.tsv"),title="")
 dev.off()
-saveImage2("dar.great.AIS.hypo.CC.pdf",width = 4,height = 3)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.AIS.hypo.great.GOCellularComponent.tsv"),title="")
-dev.off()
-saveImage2("dar.great.MIA.hyper.HPO.pdf",width = 4,height = 1.2)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.MIA.hyper.great.HumanPhenotypeOntology.tsv"),title="")
-dev.off()
-saveImage2("dar.great.IAC.hyper.BP.pdf",width = 4,height = 6)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.GOBiologicalProcess.tsv"),title="")
-dev.off()
-saveImage2("dar.great.IAC.hyper.CC.pdf",width = 4,height = 1.2)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.GOCellularComponent.tsv"),title="")
-dev.off()
-saveImage2("dar.great.IAC.hyper.HPO.pdf",width = 4,height = 1.5)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hyper.great.HumanPhenotypeOntology.tsv"),title="")
-dev.off()
-saveImage2("dar.great.IAC.hypo.BP.pdf",width = 4,height = 1.2)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"dar.p400.IAC.hypo.great.GOBiologicalProcess.tsv"),title="")
+saveImage2("dar.great.IAC.hyper.HPO.pdf",width = 4,height = 6)
+plot.great(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HyperInIAC.GOBiologicalProcess.tsv"),title="")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S2A. ATAC-seq: DAR Homer Figure. heatmap
@@ -261,8 +331,6 @@ atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'
 atacPeakTPMFeatures<-bed2Feature(atacPeakTPM)
 darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 plot.dar.status<-function(dar,dar.type){
-  SRDMR.list<-split(SRDMR,SRDMR$class)
-
   features<-rownames(dar)
   bed<-feature2Bed(features)
   tpmSelect<-atacPeakTPM[match(features, atacPeakTPMFeatures),]
@@ -280,6 +348,7 @@ plot.dar.status<-function(dar,dar.type){
   p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
   p
 }
+
 p1<-plot.dar.status(darDeseq2$darCTLvsAIS$hyper, 'HyperDARs In AIS')
 p2<-plot.dar.status(darDeseq2$darCTLvsAIS$hypo, 'HypoDARs In AIS')
 p3<-plot.dar.status(darDeseq2$darCTLvsMIA$hyper, 'HyperDARs In MIA')
@@ -292,47 +361,26 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Table S11. ATAC-seq: DAR Homer
 #----------------------------------------------------------------------------------------------------------------------
-homerAISHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hyper'))
-homerAISHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hypo'))
-homerMIAHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','MIA.hyper'))
-homerMIAHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','MIA.hypo'))
-homerIACHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hyper'))
-homerIACHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hypo'))
-
-tfs<-do.call(rbind,list(
-  # data.frame(tf=homerAISHyper, motif=names(homerAISHyper),class='AISHyperDARs'), # dim()[1]==0
-  data.frame(tf=homerAISHypo, motif=names(homerAISHypo),class='AISHypoDARs'),
-  data.frame(tf=homerMIAHyper, motif=names(homerMIAHyper),class='MIAHyperDARs'),
-  data.frame(tf=homerMIAHypo, motif=names(homerMIAHypo),class='MIAHypoDARs'),
-  data.frame(tf=homerIACHyper, motif=names(homerIACHyper),class='IACHyperDARs'),
-  data.frame(tf=homerIACHypo, motif=names(homerIACHypo),class='IACHypoDARs')
-))
-tfs$class<-factor(tfs$class, levels = names(colorMapDAR))
-motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
-
-motifTable<-data.frame(Motifs=motifWidthData$motif,
-                       TFs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
-                       AISHypoDARs=motifWidthData[,2],
-                       AISHyperDARs=0,
-                       motifWidthData[,3:ncol(motifWidthData)])
-write.csv(motifTable, file.path(CONFIG$dataResult, 'atac.dar.homer.motifs.csv'),row.names  = FALSE)
+HypoInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hypo'),'HypoInAIS')
+HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','MIA.hyper'),'HyperInMIA')
+HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hyper'),'HyperInIAC')
+HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hypo'),'HypoInIAC')
+tfs<-do.call(rbind,list(HypoInAIS,HyperInMIA,HyperInIAC, HypoInIAC))
+srdarTFs<-getSRTFS(tfs)
+saveRDS(srdarTFs,file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S2B. ATAC-seq: DAR Homer Figure. heatmap
+# Figure S2B. SRDAR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------
-tfWidthData.2<-data.frame(tfWidthData[,1:2],AISHyperDARs=0 ,tfWidthData[3:ncol(tfWidthData)])
-
-TFS<-dplyr::arrange(tfWidthData.2, desc(AISHypoDARs),desc(AISHyperDARs),desc(MIAHypoDARs),desc(MIAHyperDARs),desc(IACHypoDARs),desc(IACHyperDARs))
-m<-as.matrix(TFS[,2:ncol(TFS)])
-rownames(m)<-TFS[,1]
-m<-ifelse(m>0,1,0)
-
+srdarTFs<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
+TFS<-dplyr::arrange(srdarTFs$stage, desc(HyperInAIS),desc(HypoInAIS),desc(HyperInMIA),desc(HypoInMIA),desc(HyperInIAC),desc(HypoInIAC))
+m<-as.matrix(TFS)
 column_annotation <-HeatmapAnnotation(
-  df=data.frame(DAR=names(colorMapDAR)),
-  col = list(DAR =colorMapDAR),
+  df=data.frame(SRDAR=names(colorMapGroup)),
+  col = list(SRDAR =colorMapGroup),
   show_annotation_name =FALSE,
   annotation_name_side='left'
 )
-saveImage2("atac.dar.homer.tfs.heatmap.pdf",width = 3,height = 12)
+saveImage2("atac.dar.homer.tfs.heatmap.pdf",width = 3,height = 11)
 Heatmap(m,
         cluster_rows=FALSE,
         cluster_columns = FALSE,
@@ -343,13 +391,15 @@ Heatmap(m,
         col = colorRamp2(breaks = c(0,1.3), colors = c('white', 'black')),
         top_annotation = column_annotation,
         column_names_gp = grid::gpar(fontsize = 7),
-        row_names_gp = grid::gpar(fontsize = 4)
+        row_names_gp = grid::gpar(fontsize = 6)
 )
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S2C. ATAC-seq: DAR Homer Figure. heatmap count
 #----------------------------------------------------------------------------------------------------------------------
-data<-tfWidthData.2[2:ncol(tfWidthData.2)]
+srdarTFs<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
+
+data<-srdarTFs$stage
 mat<-sapply(names(data), function(x){
   sapply(names(data), function(y){
     sum(data[[x]]&data[[y]])

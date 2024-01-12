@@ -12,7 +12,7 @@ python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/interme
 Get the methylation level of SR-DMC and SR-DMR from methylation level matrix
 
 ```
-python ./script/methMatrixExtract.py -b /path/to/merge_ratio_bed.gz -r ./data/intermediate/srdmc.s2.bed -o ./data/intermediate/srdmc.s2.ratio.bed
+python ./script/methMatrixExtract.py -b /path/to/merge_ratio_bed.gz -r ./data/intermediate/wgbs/srdmc.bed -o ./data/intermediate/wgbs/srdmc.ratio.bed
 ```
 ### methMatrixGenerate.py
 

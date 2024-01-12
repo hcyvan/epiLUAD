@@ -12,7 +12,7 @@ data/annotation/*
 !data/annotation/readme.md
 data/external/*
 !data/external/readme.md
-data/result/*
+data/result*/*
 !data/result/readme.md
 data/intermediate/*
 !data/intermediate/readme.md

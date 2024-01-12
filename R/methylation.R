@@ -117,8 +117,6 @@ genomicRegionStatistic<-do.call(rbind,lapply(1:nrow(m),function(i){
   data.frame(GenomicRange=rownames(m)[i],Group=names(color.map), Mean=level.mean,SD=level.sd, CV=level.cv,IQR=level.iqr)
 }))
 write.csv(genomicRegionStatistic, file.path(CONFIG$dataResult, 'genomicRegionStatistic.csv'),row.names  = FALSE,quote = FALSE)
-
-
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 1D. Methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
 #----------------------------------------------------------------------------------------------------------------------
@@ -215,10 +213,8 @@ countDmcInGonomicRegion<-function(dmc) {
   count<-sapply(names(genomicRegionMethyLevel),function(x){
     bed<-genomicRegionMethyLevel[[x]]
     gr1<-bed2GRanges(bed)
-    # rbind(sum(countOverlaps(gr1, hyper)), sum(countOverlaps(gr1, hypo)), sum(width(gr1))/(1000*1000))
     rbind(sum(countOverlaps(gr1, hyper)), sum(countOverlaps(gr1, hypo)))
   })
-  # rownames(count) <- c('hyper', 'hypo', 'regionSizeMb')
   rownames(count) <- c('hyper', 'hypo')
   data.frame(count)
 }
@@ -242,9 +238,8 @@ genomicRegionDmc<-do.call(rbind,lapply(names(genomicRegionMethyLevel), function(
 }))
 genomicRegionDmc
 write.csv(genomicRegionDmc, file.path(CONFIG$dataResult, 'genomicRegionDmc.csv'),quote = FALSE)
-
 #----------------------------------------------------------------------------------------------------------------------
-# Table S7. SR-DMC
+# Table S7. Stage-Related DMCs
 #----------------------------------------------------------------------------------------------------------------------
 dmcCTLvsAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
 dmcCTLvsMIA<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.MIA.txt'),file.format='bed')
@@ -266,40 +261,52 @@ dmc<-list(
 lData<-Reduce(rbind, dmc)
 srdmc<-dcast(lData,chrom + start+ end ~ group,value.var = 'class')
 srdmc[,4:6][is.na(srdmc[,4:6])] <- "NC"
-EarlyHyperDmc<-Reduce(rbind,list(
+HyperDmcInAIS<-Reduce(rbind,list(
   filter(srdmc,AIS=='Hyper',MIA=="Hyper", IAC=="Hyper"),
   filter(srdmc,AIS=='Hyper',MIA=="Hyper", IAC=="NC"),
-  filter(srdmc,AIS=='Hyper',MIA=="NC", IAC=="NC"),
+  filter(srdmc,AIS=='Hyper',MIA=="NC", IAC=="NC")
+))%>%mutate(class='HyperInAIS')%>%dplyr::select(chrom, start,end,class)
+HyperDmcInMIA<-Reduce(rbind,list(
   filter(srdmc,AIS=='NC',MIA=="Hyper", IAC=="NC"),
   filter(srdmc,AIS=='NC',MIA=="Hyper", IAC=="Hyper")
-))%>%mutate(class='Early-Hyper-DMC')%>%dplyr::select(chrom, start,end,class)
-EarlyHypoDmc<-Reduce(rbind,list(
+))%>%mutate(class='HyperInMIA')%>%dplyr::select(chrom, start,end,class)
+HyperDmcInIAC<-Reduce(rbind,list(
+  filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hyper")
+))%>%mutate(class='HyperInIAC')%>%dplyr::select(chrom, start,end,class)
+HypoDmcInAIS<-Reduce(rbind,list(
   filter(srdmc,AIS=='Hypo',MIA=="Hypo", IAC=="Hypo"),
   filter(srdmc,AIS=='Hypo',MIA=="Hypo", IAC=="NC"),
-  filter(srdmc,AIS=='Hypo',MIA=="NC", IAC=="NC"),
+  filter(srdmc,AIS=='Hypo',MIA=="NC", IAC=="NC")
+))%>%mutate(class='HypoInAIS')%>%dplyr::select(chrom, start,end,class)
+HypoDmcInMIA<-Reduce(rbind,list(
   filter(srdmc,AIS=='NC',MIA=="Hypo", IAC=="NC"),
   filter(srdmc,AIS=='NC',MIA=="Hypo", IAC=="Hypo")
-))%>%mutate(class='Early-Hypo-DMC')%>%dplyr::select(chrom, start,end,class)
-
-
-LateHyperDmc<-filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hyper")%>%mutate(class='Late-Hyper-DMC')%>%dplyr::select(chrom, start,end,class)
-LateHypoDmc<-filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hypo")%>%mutate(class='Late-Hypo-DMC')%>%dplyr::select(chrom, start,end,class)
-
-SRDMC<-Reduce(rbind,list(EarlyHyperDmc,EarlyHypoDmc,LateHyperDmc,LateHypoDmc))
+))%>%mutate(class='HypoInMIA')%>%dplyr::select(chrom, start,end,class)
+HypoDmcInIAC<-Reduce(rbind,list(
+  filter(srdmc,AIS=='NC',MIA=="NC", IAC=="Hypo")
+))%>%mutate(class='HypoInIAC')%>%dplyr::select(chrom, start,end,class)
+SRDMC<-Reduce(rbind,list(
+  HyperDmcInAIS=HyperDmcInAIS,
+  HyperDmcInMIA=HyperDmcInMIA,
+  HyperDmcInIAC=HyperDmcInIAC,
+  HypoDmcInAIS=HypoDmcInAIS,
+  HypoDmcInMIA=HypoDmcInMIA,
+  HypoDmcInIAC=HypoDmcInIAC
+))
 SRDMC$chrom <- factor(SRDMC$chrom, levels=chromFactorLevel)
 SRDMC<-arrange(SRDMC, chrom, start)
-
-srdmc.count<-count(srdmc,AIS,IAC,MIA)%>%arrange(desc(n))
+srdmc.count<-count(srdmc,AIS,IAC,MIA)%>%dplyr::select(AIS, MIA, IAC, n)%>%arrange(AIS, MIA, IAC)
 SRDMC.count<-count(SRDMC, class)%>%arrange(desc(n))
 
-write.table(SRDMC, file.path(CONFIG$dataIntermediate, 'srdmc.s2.bed'), quote = FALSE, sep = "\t", row.names = FALSE,col.names=FALSE)
-write.csv(srdmc.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.detail.csv'), quote = FALSE, row.names = FALSE)
-write.csv(SRDMC.count, file.path(CONFIG$dataResult, 'srdmc.s2.count.csv'), quote = FALSE, row.names = FALSE)
+saveTsv(SRDMC, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.bed'),col.names=FALSE)
+saveCsv(srdmc.count, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.count.detail.csv'))
+saveCsv(SRDMC.count, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.count.csv'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2B,C. SR-DMC Mehtylation Levels Heatmap
+# Figure 2B-D. SRDMC Mehtylation Levels Heatmap
 #----------------------------------------------------------------------------------------------------------------------
-dataj<-readRDS(file.path(CONFIG$dataIntermediate, 'dmc.methyLevel.rds'))
-dataj<-split(dataj,dataj$class)
+srdmcMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate, 'wgbs','dmc.methyLevel.rds'))
+# dataj<-readRDS(file.path(CONFIG$dataIntermediate, 'dmc.methyLevel.rds'))
+srdmcMethyLevel<-split(srdmcMethyLevel,srdmcMethyLevel$class)
 plot.srdmc<-function(data){
   m<-as.matrix(data[,5:ncol(data)])
   m1<-m[rowSums(is.na(m))==0,]
@@ -311,13 +318,13 @@ plot.srdmc<-function(data){
     show_annotation_name =FALSE,
     annotation_name_side='left'
   )
-  print(dim(m1))
-  if (nrow(m1) >=5000){
+  nrow1<-nrow(m1)
+  if (nrow(m1) >=1000){
     set.seed(123)
-    m1<-m1[sample(1:nrow(m1),5000),]
+    m1<-m1[sample(1:nrow(m1),1000),]
   }
-  print(dim(m1))
-  options(heatmap_raster_threshold = 1000)
+  nrow2<-nrow(m1)
+  print(sprintf("%d => %d", nrow1, nrow2))
   Heatmap(m1,
           top_annotation = column_annotation,
           cluster_rows=TRUE,
@@ -333,25 +340,38 @@ plot.srdmc<-function(data){
           ),
   )
 }
-saveImage2("srdmr.heatmap.Early-Hyper-DMC.pdf",width = 5,height = 4)
-plot.srdmc(dataj$`Early-Hyper-DMC`)
+
+saveImage2("srdmr.heatmap.HyperInAIS.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HyperInAIS)
 dev.off()
-saveImage2("srdmr.heatmap.Early-Hypo-DMC.pdf",width = 5,height = 4)
-plot.srdmc(dataj$`Early-Hypo-DMC`)
+saveImage2("srdmr.heatmap.HyperInMIA.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HyperInMIA)
 dev.off()
-saveImage2("srdmr.heatmap.Late-Hyper-DMC.pdf",width = 5,height = 4)
-plot.srdmc(dataj$`Late-Hyper-DMC`)
+saveImage2("srdmr.heatmap.HyperInIAC.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HyperInIAC)
 dev.off()
-saveImage2("srdmr.heatmap.Late-Hypo-DMC.pdf",width = 5,height = 4)
-plot.srdmc(dataj$`Late-Hypo-DMC`)
+saveImage2("srdmr.heatmap.HypoInAIS.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HypoInAIS)
+dev.off()
+saveImage2("srdmr.heatmap.HypoInMIA.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HypoInMIA)
+dev.off()
+saveImage2("srdmr.heatmap.HypoInIAC.pdf",width = 3.5,height = 2)
+plot.srdmc(srdmcMethyLevel$HypoInIAC)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMR
-# eg: python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/intermediate/srdmr.s2.bed
+# eg: python ./script/dmc2dmr.py -i ./data/intermediate/wgbs/srdmc.bed -o ./data/intermediate/wgbs/srdmr.bed
 #----------------------------------------------------------------------------------------------------------------------
 SRDMR<-loadSRDMR()
 SRDMR.count<-count(SRDMR, class)%>%arrange(desc(n))
-write.csv(SRDMR.count, file.path(CONFIG$dataResult, 'srdmr.s2.count.csv'), quote = FALSE, row.names = FALSE)
+saveCsv(SRDMR.count, file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.count.csv'))
+saveTsv(filter(SRDMR,class=='HyperInAIS')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HyperInAIS.bed'),col.names = FALSE)
+saveTsv(filter(SRDMR,class=='HypoInAIS')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HypoInAIS.bed'),col.names = FALSE)
+saveTsv(filter(SRDMR,class=='HyperInMIA')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HyperInMIA.bed'),col.names = FALSE)
+saveTsv(filter(SRDMR,class=='HypoInMIA')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HypoInMIA.bed'),col.names = FALSE)
+saveTsv(filter(SRDMR,class=='HyperInIAC')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HyperInIAC.bed'),col.names = FALSE)
+saveTsv(filter(SRDMR,class=='HypoInIAC')[,1:3], file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.HypoInIAC.bed'),col.names = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
 # Table S8. SR-DMR in genomic regions
 #----------------------------------------------------------------------------------------------------------------------
@@ -373,7 +393,7 @@ plot.srdmr.barplot.genomicRegion <- function(regions){
   ggplot(data=df, aes(y=value, x=region, fill=Stage))+
     scale_fill_manual(values=colorMapSRDMR)+
     geom_bar(stat="identity", position=position_dodge())+
-    ylab("SR-DMRs Number")+
+    ylab("SRDMRs Number")+
     xlab("Genomic Regions")+
     theme_classic()
 }
@@ -386,9 +406,14 @@ regions<-c('promoter.1k'='Promoter.1k', 'promoter.5k'='Promoter.5k', 'utr5'="5'U
 plot.srdmr.barplot.genomicRegion(regions)
 dev.off()
 
-write.csv(data.frame(t(SRDMR.genomicRegion)), file.path(CONFIG$dataResult, 'srdmr.s2.count.genomicRegion.csv'), quote = FALSE)
+out<-data.frame(
+  SRDMR=colnames(SRDMR.genomicRegion),
+  sum=colSums(SRDMR.genomicRegion),
+  t(SRDMR.genomicRegion)
+)
+saveCsv(out, file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.count.genomicRegion.csv'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2D. SR-DMR Density near TSS and CGI
+# Figure 2F. SRDMRs Density near TSS and CGI
 #----------------------------------------------------------------------------------------------------------------------
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 cgIslands.gr<-genomicRegion$cgIslands
@@ -440,7 +465,7 @@ plot.scdmr.density.tss.vs.cgi<-function(g) {
   names(colorMap)<-c("TSS","CGI")
   plot(NA, main = g,
        xlab = "Distance to TSS/CGI",
-       ylab = "SC-DMR Density",
+       ylab = "SCDMR Density",
        xlim=xlim,
        ylim=ylim,
        col = "blue")
@@ -449,45 +474,26 @@ plot.scdmr.density.tss.vs.cgi<-function(g) {
   legend("topleft", legend=names(colorMap), fill=colorMap, bty = "n")
 }
 
-saveImage2("srdmr.density.genomicRegion.pdf",width = 6,height = 5)
-par(mfrow = c(2, 2))
-plot.scdmr.density.tss.vs.cgi('Early-Hyper-DMR')
-plot.scdmr.density.tss.vs.cgi('Early-Hypo-DMR')
-plot.scdmr.density.tss.vs.cgi('Late-Hyper-DMR')
-plot.scdmr.density.tss.vs.cgi('Late-Hypo-DMR')
+saveImage2("srdmr.density.genomicRegion.pdf",width = 3.5,height = 6)
+par(mfrow = c(3, 2))
+plot.scdmr.density.tss.vs.cgi('HyperInAIS')
+plot.scdmr.density.tss.vs.cgi('HypoInAIS')
+plot.scdmr.density.tss.vs.cgi('HyperInMIA')
+plot.scdmr.density.tss.vs.cgi('HypoInMIA')
+plot.scdmr.density.tss.vs.cgi('HyperInIAC')
+plot.scdmr.density.tss.vs.cgi('HypoInIAC')
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2E,F. GREAT analysis of SR-DMR
+# Figure 2F,G. GREAT analysis of SRDMRs
 #----------------------------------------------------------------------------------------------------------------------
-saveImage2("srdmr.great.EarlyHyperDmr.BP.pdf",width = 4,height = 6)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hyper-DMC.great.GOBiologicalProcess.tsv"),title="")
+saveImage2("srdmr.great.HyperInAIS.BP.pdf",width = 4,height = 3.5)
+plot.great(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HyperInAIS.GOBiologicalProcess.tsv"),title="")
 dev.off()
-saveImage2("srdmr.great.EarlyHyperDmr.CC.pdf",width = 4,height = 2)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hyper-DMC.great.GOCellularComponent.tsv"),title="Cellular Component")
-dev.off()
-saveImage2("srdmr.great.EarlyHypoDmr.BP.pdf",width = 4,height = 3)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Early-Hypo-DMC.great.GOBiologicalProcess.tsv"),title="Biological Process")
-dev.off()
-saveImage2("srdmr.great.LateHyperDmr.BP.pdf",width = 4,height = 6)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hyper-DMC.great.GOBiologicalProcess.tsv"),title="Biological Process")
-dev.off()
-saveImage2("srdmr.great.LateHyperDmr.MF.pdf",width = 7,height = 6)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hyper-DMC.great.GOMolecularFunction.tsv"),title="Molecular Function")
-dev.off()
-saveImage2("srdmr.great.LateHypoDmr.BP.pdf",width = 4,height = 3.5)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOBiologicalProcess.tsv"),title="")
-dev.off()
-saveImage2("srdmr.great.LateHypoDmr.MF.pdf",width = 7,height = 1.5)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOMolecularFunction.tsv"),title="Molecular Function")
-dev.off()
-saveImage2("srdmr.great.LateHypoDmr.CC.pdf",width = 4,height = 1.5)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.GOCellularComponent.tsv"),title="Cellular Component")
-dev.off()
-saveImage2("srdmr.great.LateHypoDmr.HPO.pdf",width = 4,height = 1.5)
-plot.great(file.path(CONFIG$dataIntermediate, "srdmr.s2.Late-Hypo-DMC.great.HumanPhenotypeOntology.tsv"),title="Human Phenotype Ontology")
+saveImage2("srdmr.great.HypoInIAC.BP.pdf",width = 4,height = 3.5)
+plot.great(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HypoInIAC.GOBiologicalProcess.tsv"),title="")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S1A. SR-DMR Length and CpG Number
+# Figure S1A. SRDMRs Length and CpG Number
 #----------------------------------------------------------------------------------------------------------------------
 SRDMR<-bed2GRanges(loadSRDMR())
 SRDMR.list<-split(SRDMR,SRDMR$class)
@@ -504,12 +510,14 @@ plot.scdmr.status<-function(srdmr.type){
   p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
   p
 }
-p1<-plot.scdmr.status('Early-Hyper-DMR')
-p2<-plot.scdmr.status('Early-Hypo-DMR')
-p3<-plot.scdmr.status('Late-Hyper-DMR')
-p4<-plot.scdmr.status('Late-Hypo-DMR')
-saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 6,height = 6)
-grid.arrange(p1, p2,p3,p4, nrow = 2)
+p1<-plot.scdmr.status('HyperInAIS')
+p2<-plot.scdmr.status('HypoInAIS')
+p3<-plot.scdmr.status('HyperInMIA')
+p4<-plot.scdmr.status('HypoInMIA')
+p5<-plot.scdmr.status('HyperInIAC')
+p6<-plot.scdmr.status('HypoInIAC')
+saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 4,height = 6.5)
+grid.arrange(p1,p2,p3,p4,p5,p6, nrow = 3)
 dev.off()
 srdmr.status<-sapply(SRDMR.list, function(x){
   out<-c(mean(x$cpg),mean(x$length))
@@ -519,73 +527,29 @@ srdmr.status<-sapply(SRDMR.list, function(x){
 srdmr.status<-data.frame(srdmr.status)
 write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S1A. SR-DMR Length and CpG Number
+# Table S9. SRDMRs Homer
 #----------------------------------------------------------------------------------------------------------------------
-SRDMR<-bed2GRanges(loadSRDMR())
-SRDMR.list<-split(SRDMR,SRDMR$class)
-plot.scdmr.status<-function(srdmr.type){
-  SRDMR.list<-split(SRDMR,SRDMR$class)
-  gr<-SRDMR.list[[srdmr.type]]
-  data<-data.frame(x=gr$length, y=gr$cpg)
-  p_scatter <- ggplot(data, aes(x = x, y = y)) +
-    geom_point(size=0.3,alpha = 0.6) +
-    xlab("SC-DMR size (bp)")+
-    ylab("SC-DMR Number")+
-    ggtitle(srdmr.type)+
-    theme_bw()
-  p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
-  p
-}
-p1<-plot.scdmr.status('Early-Hyper-DMR')
-p2<-plot.scdmr.status('Early-Hypo-DMR')
-p3<-plot.scdmr.status('Late-Hyper-DMR')
-p4<-plot.scdmr.status('Late-Hypo-DMR')
-saveImage2("srdmr.status.scatter.cpg.length.pdf",width = 6,height = 6)
-grid.arrange(p1, p2,p3,p4, nrow = 2)
-dev.off()
-srdmr.status<-sapply(SRDMR.list, function(x){
-  out<-c(mean(x$cpg),mean(x$length))
-  names(out)<-c('Average CpG Number', 'Average Size')
-  out
-})
-srdmr.status<-data.frame(srdmr.status)
-write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
-#----------------------------------------------------------------------------------------------------------------------
-# Table S9. SR-DMR Homer
-#----------------------------------------------------------------------------------------------------------------------
-homerEarlyHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hyper-DMC'))
-homerEarlyHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Early-Hypo-DMC'))
-homerLateHyper=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hyper-DMC'))
-homerLateHypo=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'homer.s2.mask','Late-Hypo-DMC'))
+HyperInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInAIS'), 'HyperInAIS')
+HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInMIA'), 'HyperInMIA')
+HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInIAC'), 'HyperInIAC')
+HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HypoInIAC'), 'HypoInIAC')
 
-tfs<-do.call(rbind,list(
-  data.frame(tf=homerEarlyHyper, motif=names(homerEarlyHyper),class='Early-Hyper-DMR'),
-  data.frame(tf=homerEarlyHypo, motif=names(homerEarlyHypo),class='Early-Hypo-DMR'),
-  data.frame(tf=homerLateHyper, motif=names(homerLateHyper),class='Late-Hyper-DMR'),
-  data.frame(tf=homerLateHypo, motif=names(homerLateHypo),class='Late-Hypo-DMR')
-))
-tfWidthData<-dcast(tfs, tf~class,fun.aggregate = length)
-motifWidthData<-dcast(tfs, motif~class,fun.aggregate = length)
-
-motifTable<-data.frame(Motifs=motifWidthData$motif,
-                       TFs=sapply(strsplit(motifWidthData$motif,'\\('),function(x){x[1]}),
-                       motifWidthData[,2:5])
-write.csv(motifTable, file.path(CONFIG$dataResult, 'srdmr.homer.motifs.csv'),row.names  = FALSE)
+tfs<-do.call(rbind,list(HyperInAIS,HyperInMIA,HyperInIAC,HypoInIAC))
+srdmrTFs<-getSRTFS(tfs)
+saveRDS(srdmrTFs,file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S1B. SR-DMR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------
-TFS<-dplyr::arrange(tfWidthData, desc(`Early-Hyper-DMR`),desc(`Early-Hypo-DMR`),desc(`Late-Hyper-DMR`),desc(`Late-Hypo-DMR`))
-m<-as.matrix(TFS[,2:ncol(TFS)])
-rownames(m)<-TFS[,1]
-m<-ifelse(m>0,1,0)
-
+srdmrTFs<-readRDS(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
+TFS<-dplyr::arrange(srdmrTFs$stage, desc(HyperInAIS),desc(HypoInAIS),desc(HyperInMIA),desc(HypoInMIA),desc(HyperInIAC),desc(HypoInIAC))
+m<-as.matrix(TFS)
 column_annotation <-HeatmapAnnotation(
-  df=data.frame(SRDMR=names(colorMapSRDMR)),
-  col = list(SRDMR =colorMapSRDMR),
+  df=data.frame(SRDMR=names(colorMapGroup)),
+  col = list(SRDMR =colorMapGroup),
   show_annotation_name =FALSE,
   annotation_name_side='left'
 )
-saveImage2("srdmr.homer.tfs.heatmap.pdf",width = 3,height = 12)
+saveImage2("srdmr.homer.tfs.heatmap.pdf",width = 3,height = 8)
 Heatmap(m,
         cluster_rows=FALSE,
         cluster_columns = FALSE,
@@ -596,13 +560,14 @@ Heatmap(m,
         col = colorRamp2(breaks = c(0,1.3), colors = c('white', 'black')),
         top_annotation = column_annotation,
         column_names_gp = grid::gpar(fontsize = 7),
-        row_names_gp = grid::gpar(fontsize = 5)
+        row_names_gp = grid::gpar(fontsize = 6)
 )
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S1C. SR-DMR Homer Figure. heatmap count
 #----------------------------------------------------------------------------------------------------------------------
-data<-tfWidthData[2:5]
+srdmrTFs<-readRDS(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
+data<-srdmrTFs$stage
 mat<-sapply(names(data), function(x){
   sapply(names(data), function(y){
     sum(data[[x]]&data[[y]])
