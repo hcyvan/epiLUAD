@@ -14,33 +14,6 @@ library(gridExtra)
 library(ggpubr)
 library(clusterProfiler)
 library(org.Hs.eg.db)
-
-plotBarError<-function(valueStage, xlabel="",ylabel="TPM"){
-  ggplot(data=valueStage,aes(x=stage,y=value,fill=stage))+
-    scale_fill_manual(values=colorMapStage) +
-    stat_summary(mapping=aes(fill = stage),fun=mean,geom = "bar",fun.args = list(mult=1),width=0.7)+
-    stat_summary(fun.data=mean_sdl,fun.args = list(mult=0.3),geom="errorbar",width=0.2) +
-    labs(x=xlabel,y=ylabel)+
-    theme_classic()+
-    theme(legend.position="none",
-          axis.title.x = element_text(size=15),
-          axis.title.y = element_text(size=15),
-          axis.text = element_text(size = 12,colour="black"))+
-    guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
-}
-
-plotBarTPM<-function(geneSymbol){
-  rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
-  symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
-  gene<-unlist(rnaTPM[match(geneSymbol, symbol),][-1])
-  samples<-groups$RNA$selectBySample(names(gene))
-  data<-data.frame(
-    stage=samples$Group,
-    value=gene
-  )
-  plotBarError(data, xlabel=geneSymbol,ylabel="TPM")
-}
-
 #----------------------------------------------------------------------------------------------------------------------
 # RNA-seq: Differential Expression Analysis
 #----------------------------------------------------------------------------------------------------------------------
@@ -145,6 +118,22 @@ degStage<-list(
   IAC=setdiff(deg$IAC$genes, union(deg$AIS$genes,deg$MIA$genes))
 )
 sapply(degStage, function(x){length(x)})
+
+srdegDetail<-lapply(names(degStage), function(x){
+  genes<-degStage[[x]]
+  DEG<-deg[[x]]
+  DEG[match(genes, DEG$genes),]
+})
+names(srdegDetail)<-names(degStage)
+srdegDetail$AIS$class<-ifelse(srdegDetail$AIS$logFC>0, 'UpInAIS','DownInAIS')
+srdegDetail$MIA$class<-ifelse(srdegDetail$MIA$logFC>0, 'UpInMIA','DownInMIA')
+srdegDetail$IAC$class<-ifelse(srdegDetail$IAC$logFC>0, 'UpInIAC','DownInIAC')
+
+SRDEG<-list(
+  deg=degStage,
+  detail=srdegDetail
+)
+saveRDS(SRDEG, file.path(CONFIG$dataIntermediate,'rna', 'srdeg.rds'))
 saveRDS(degStage, file.path(CONFIG$dataIntermediate,'rna', 'deg.stage.rds'))
 plot.degStage<-function(gene) {
   rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
@@ -187,45 +176,39 @@ dev.off()
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S3E Expression of 24 significant differential expression TFs
+# Figure S3C Expression of significant differential expression epiTFs
 #----------------------------------------------------------------------------------------------------------------------
-tf124gene<-loadData2(file.path(CONFIG$dataResult,'tf.epTFs.csv'))
+rnaTPM<-RnaTPM('RNA')
+epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))
 deg<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.rds'))
-tf124<-loadData2(file.path(CONFIG$dataIntermediate,'tf', 'tf124.txt'),file.format = 'bed',header = FALSE)$V1
-geneTf124<-na.omit(unique(tf124gene$gene))
-tf124DEG<-lapply(deg,function(x){
-  intersect(x$genes, geneTf124)
-})
-tf124DEGList<-unique(unlist(tf124DEG))
-p1<-plotBarTPM(tf124DEGList[1])
-p2<-plotBarTPM(tf124DEGList[2])
-p3<-plotBarTPM(tf124DEGList[3])
-p4<-plotBarTPM(tf124DEGList[4])
-p5<-plotBarTPM(tf124DEGList[5])
-p6<-plotBarTPM(tf124DEGList[6])
-p7<-plotBarTPM(tf124DEGList[7])
-p8<-plotBarTPM(tf124DEGList[8])
-p9<-plotBarTPM(tf124DEGList[9])
-p10<-plotBarTPM(tf124DEGList[10])
-p11<-plotBarTPM(tf124DEGList[11])
-p12<-plotBarTPM(tf124DEGList[12])
-p13<-plotBarTPM(tf124DEGList[13])
-p14<-plotBarTPM(tf124DEGList[14])
-p15<-plotBarTPM(tf124DEGList[15])
-p16<-plotBarTPM(tf124DEGList[16])
-p17<-plotBarTPM(tf124DEGList[17])
-p18<-plotBarTPM(tf124DEGList[18])
-p19<-plotBarTPM(tf124DEGList[19])
-p20<-plotBarTPM(tf124DEGList[20])
-p21<-plotBarTPM(tf124DEGList[21])
-p22<-plotBarTPM(tf124DEGList[22])
-p23<-plotBarTPM(tf124DEGList[23])
-p24<-plotBarTPM(tf124DEGList[24])
+genes<-lapply(deg,function(x){
+  intersect(x$genes, epiTFs$tf)
+})%>%unlist()%>%unique()
 
-saveImage2("tf124.deg.tf24.pdf",width = 14,height = 8)
-grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20,p21,p22,p23,p24,nrow = 4)
+p1<-rnaTPM$plotStageBar(genes[1])
+p2<-rnaTPM$plotStageBar(genes[2])
+p3<-rnaTPM$plotStageBar(genes[3])
+p4<-rnaTPM$plotStageBar(genes[4])
+p5<-rnaTPM$plotStageBar(genes[5])
+p6<-rnaTPM$plotStageBar(genes[6])
+p7<-rnaTPM$plotStageBar(genes[7])
+p8<-rnaTPM$plotStageBar(genes[8])
+p9<-rnaTPM$plotStageBar(genes[9])
+p10<-rnaTPM$plotStageBar(genes[10])
+p11<-rnaTPM$plotStageBar(genes[11])
+p12<-rnaTPM$plotStageBar(genes[12])
+p13<-rnaTPM$plotStageBar(genes[13])
+p14<-rnaTPM$plotStageBar(genes[14])
+p15<-rnaTPM$plotStageBar(genes[15])
+p16<-rnaTPM$plotStageBar(genes[16])
+p17<-rnaTPM$plotStageBar(genes[17])
+p18<-rnaTPM$plotStageBar(genes[18])
+p19<-rnaTPM$plotStageBar(genes[19])
+p20<-rnaTPM$plotStageBar(genes[20])
+
+saveImage2("rna.deg.epiTFs.barplot.pdf",width = 8,height = 8)
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20,nrow = 5)
 dev.off()
-
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 4D,E,F DEGs Enrichment Analysis
 #----------------------------------------------------------------------------------------------------------------------
@@ -309,11 +292,8 @@ plot.clusterprofiler(goIAC$mf)
 deg<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.rds'))
 rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
 symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
-epiTfs <- loadData2(file.path(CONFIG$dataIntermediate, 'tf','tf.epTFs.csv'))
-geneTf124<-na.omit(unique(epiTfs$gene))
-genes<-c()
-genes<-unique(c(genes, unlist(sapply(deg, function(x){x$genes}))))
-genes<-unique(c(genes, geneTf124))
+epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))
+genes<-unique(c(unlist(sapply(deg,function(x){x$genes})),epiTFs$tf))
 keep<-match(genes, symbol)[!is.na(match(genes, symbol))]
 m<-as.matrix(rnaTPM[keep,-1])
 rownames(m)<-symbol[keep]
@@ -324,11 +304,12 @@ a[lower.tri(a)]<-1
 df0<-melt(a)
 df0<-filter(df0, value<1)
 
-tfDEG<-df0[(df0$Var1%in%geneTf124|df0$Var2%in%geneTf124),]
+
+tfDEG<-df0[(df0$Var1%in%epiTFs$tf|df0$Var2%in%epiTFs$tf),]
 tfDEG$Var1<-as.vector(tfDEG$Var1)
 tfDEG$Var2<-as.vector(tfDEG$Var2)
-tfDEG$tf<-ifelse(tfDEG$Var1%in%geneTf124, tfDEG$Var1, tfDEG$Var2)
-tfDEG$gene<-ifelse(tfDEG$Var1%in%geneTf124, tfDEG$Var2, tfDEG$Var1)
+tfDEG$tf<-ifelse(tfDEG$Var1%in%epiTFs$tf, tfDEG$Var1, tfDEG$Var2)
+tfDEG$gene<-ifelse(tfDEG$Var1%in%epiTFs$tf, tfDEG$Var2, tfDEG$Var1)
 tfDEG<-dplyr::select(tfDEG, tf, gene, value)
 saveRDS(tfDEG,file.path(CONFIG$dataIntermediate, 'tf','tf.epiTFs.deg.cor.rds'))
 df<-filter(tfDEG,abs(value)>=0.7)
@@ -336,12 +317,18 @@ tfCorNumber<-sapply(split(df, df$tf),function(x){
   nrow(x)
 })
 tfCorNumber<-sort(tfCorNumber, decreasing = TRUE)
-saveImage2("rna.deg.tf124.coexp.pdf",width = 14,height = 4)
-barplot(tfCorNumber,ylab="Co-expression gene number",las=2,cex.names =0.8, col='red')
+saveImage2("rna.deg.epiTFs.coexp.pdf",width = 10,height = 3)
+barplot(tfCorNumber,ylab="Co-Expression Gene",las=2,cex.names =0.8, col='red')
 dev.off()
 
+df<-filter(tfDEG,abs(value)>=0.85)
+tfCorNumber<-sapply(split(df, df$tf),function(x){
+  nrow(x)
+})
+tfCorNumber<-sort(tfCorNumber, decreasing = TRUE)
+tfCorNumber
 
-
+saveCsv(df,file.path(CONFIG$dataIntermediate, 'rna','rna.deg.epiTFs.coexp.csv'))
 
 
 
@@ -429,6 +416,7 @@ plotBarTPM('DUSP6')# up;;target
 #
 plotBarTPM('PDCD1')# no;;target
 plotBarTPM('CD274')# no;;target
+
 
 ############
 

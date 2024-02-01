@@ -44,4 +44,5 @@ python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/interme
 ```{bash}
 findMotifsGenome.pl ../srdmr.HypoInIAC.bed hg38 ./HypoInIAC -mask
 ```
-
+## bigwig
+bigwigAverage -b CTL_41.bigwig CTL_64.bigwig CTL_74.bigwig CTL_78.bigwig -o CTL.2.bw

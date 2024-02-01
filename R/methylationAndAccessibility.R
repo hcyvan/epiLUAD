@@ -1,5 +1,4 @@
 source('./R/base.R')
-source('./R/local/base.R')
 library(dplyr)
 library(reshape2)
 library(ComplexHeatmap)
@@ -208,23 +207,16 @@ darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 data.atacPeakTPM<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), atacPeakTPM)
 data.atacPeakMethyLevel<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), atacPeakMethyLevel)
 data.rnaTPM<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), rnaTPM)
+epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))
+epiTFsDAR<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.DAR.rds'))
 
-allMotif<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.DAR.rds'))
-epiTfs <- loadData2(file.path(CONFIG$dataIntermediate, 'tf','tf.epTFs.csv'))
-motifs<-unique(allMotif$`Motif Name`)
-epiTFsMotif<-data.frame(
-  motif=motifs,
-  tf=sapply(strsplit(motifs, '\\('),function(x){x[1]})
-)
-epiTFsMotif<-left_join(epiTFsMotif, epiTfs, by = 'tf')
-epiTFsMotif<-filter(epiTFsMotif, !is.na(gene))
 
-getCorAcessMethyTpm<-function(tf, gene, motif){
+getCorAcessMethyTpm<-function(gene){
   selectTPM<-unlist(data.rnaTPM[match(gene, rnaTPMSymbol),])
   if(sum(is.na(selectTPM))>0){
     return(NA)
   }
-  selectMotifRegion<-intersect(rownames(darDeseq2$darCTLvsIAC$hyper),unique(allMotif[allMotif$`Motif Name`%in%motif,]$PositionID))
+  selectMotifRegion<-intersect(rownames(darDeseq2$darCTLvsIAC$hyper), (epiTFsDAR[epiTFsDAR$tf==gene,])$feature)
   selectMotifIdx<-match(selectMotifRegion,bed2Feature(atacPeakTPM))
   access<-data.atacPeakTPM[selectMotifIdx,]
   methy<-data.atacPeakMethyLevel[selectMotifIdx,]
@@ -233,7 +225,6 @@ getCorAcessMethyTpm<-function(tf, gene, motif){
   keep.methy<-which(rowSums(is.na(methy))==0)
   methy<-methy[keep.methy,]
   access<-access[keep.methy,]
-  
   corAcessMethyTpm<-data.frame(t(sapply(1:nrow(access), function(i){
     x<-unlist(access[i,])
     y<-unlist(methy[i,])
@@ -255,13 +246,12 @@ getCorAcessMethyTpm<-function(tf, gene, motif){
   ))
 }
 
-epiTFsCorAMTinHyperDarIAC<-lapply(split(epiTFsMotif, epiTFsMotif$gene), function(x){
-  tf<-x[1,2]
-  gene<-x[1,3]
-  motif<-unlist(x[,1])
-  print(tf)
-  getCorAcessMethyTpm(tf,gene,motif)
+
+epiTFsCorAMTinHyperDarIAC<-lapply(epiTFs$tf, function(x){
+  print(x)
+  getCorAcessMethyTpm(x)
 })
+names(epiTFsCorAMTinHyperDarIAC)<-epiTFs$tf
 epiTFsCorAMTinHyperDarIAC$MEF2B<-NULL
 saveRDS(epiTFsCorAMTinHyperDarIAC, file.path(CONFIG$dataIntermediate,'atac', 'epiTFsCorAMTinHyperDarIAC.rds'))
 
@@ -289,10 +279,10 @@ plotCor<-function(key,color, label){
     guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
 }
 
-saveImage2("atac.wgbs.epiTFs.CorAcessMethyTpm.pdf",width = 16,height = 6)
 p1<-plotCor('AccessMethy','green3', 'Correlation')
 p2<-plotCor('AccessTPM','red3', 'Correlation ')
 p3<-plotCor('MethyTPM','orange3', 'Correlation ')
+saveImage2("atac.wgbs.epiTFs.CorAcessMethyTpm.pdf",width = 12,height = 6)
 grid.arrange(p1, p2,p3, nrow = 3)
 dev.off()
 
@@ -303,29 +293,4 @@ plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
 legend("topleft", legend = type, pch=15, pt.cex=3, cex=1.5, bty='n',col = alpha(colors),horiz=FALSE)
 dev.off()
 
-# 
-# TFinfo<-amt$ASCL1
-# par(mfrow = c(9, 3))
-# par(mar = c(2, 4, 1, 1))
-# for(i in 1:9){
-#   corAcessMethyTpm<-TFinfo$corAcessMethyTpm
-#   access<-TFinfo$access
-#   methy<-TFinfo$methy
-#   selectTPM<-TFinfo$selectTPM
-#   
-#   idx<-corAcessMethyTpm[i,]$order
-#   x<-unlist(access[idx,])
-#   y<-unlist(methy[idx,])
-#   z<-unlist(selectTPM)
-#   plot(x,y, xlab="Accessibility", ylab='Methylation Level',pch=19,col=(groups$WGBS.RNA.ATAC$select(names(colorMapStage)))$colors)
-#   abline(lm(y ~ x))
-#   plot(z,x, ylab="Accessibility", xlab='Motif TPM',pch=19,col=(groups$WGBS.RNA.ATAC$select(names(colorMapStage)))$colors)
-#   abline(lm(x ~ z))
-#   plot(z,y, ylab="Methylation Level", xlab='Motif TPM',pch=19,col=(groups$WGBS.RNA.ATAC$select(names(colorMapStage)))$colors)
-#   abline(lm(y ~ z))
-# }
-#----------------------------------------------------------------------------------------------------------------------
-# DARs and SC-DMRs Correlation
-#----------------------------------------------------------------------------------------------------------------------
 
-       

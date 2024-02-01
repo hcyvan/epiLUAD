@@ -4,6 +4,9 @@ library(tools)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(ggplot2)
+library(ChIPseeker)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(circlize)
 
 configDefaultPath <- './config.default.yaml'
 configPath <- './config.yaml'
@@ -24,6 +27,14 @@ CONFIG['dataResult']<-'./data/result'
 DATA_DIR <- CONFIG$dataDir
 IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
+annoPeak<-function(peakGr) {
+  peakAnno <- annotatePeak(peakGr, tssRegion = c(-5000, 5.000), TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene)
+  peakAnno@anno$symbol<-mapIds(org.Hs.eg.db, keys = peakAnno@anno$geneId, column = "SYMBOL", keytype = "ENTREZID", multiVals = "first")
+  peakAnno@anno$ensembl<-mapIds(org.Hs.eg.db, keys = peakAnno@anno$geneId, column = "ENSEMBL", keytype = "ENTREZID", multiVals = "first")
+  anno<-peakAnno@anno
+  anno[abs(anno$distanceToTSS)<100000,]
+}
+
 writeBed<-function(bed,file.name){
   write.table(bed, file.name,row.names = FALSE,sep = '\t',quote = FALSE, col.names = FALSE)
 }
@@ -160,6 +171,10 @@ feature2Bed<-function(feature) {
   bed
 }
 
+feature2GRanges<-function(feature){
+  bed2GRanges(feature2Bed(feature))
+}
+
 bed2Feature<-function(bed){
   paste(paste(bed[,1], bed[,2], sep=':'),bed[,3],sep='-')
 }
@@ -177,7 +192,10 @@ bed2GRanges<-function(bed){
 GRanges2bed<-function(gr){
   data.frame(chrom=seqnames(gr), start=start(gr)-1, end=end(gr))
 }
-
+GRanges2Feature<-function(gr){
+  bed<-data.frame(chrom=seqnames(gr), start=start(gr)-1, end=end(gr))
+  bed2Feature(bed)
+}
 percent2Numeric <- function(x){
   as.numeric(substr(x,0,nchar(x)-1))/100
 }
@@ -279,6 +297,44 @@ plot.great<-function(tsv,cutoff=0.01,title="") {
   enrich<-filter(enrich, BinomFDRQVal<=cutoff)
   plotEnrich(enrich$TermName, enrich$BinomFDRQVal, title)
 }
+plotBarError<-function(valueStage, xlabel="",ylabel="TPM"){
+  ggplot(data=valueStage,aes(x=stage,y=value,fill=stage))+
+    scale_fill_manual(values=colorMapStage) +
+    stat_summary(mapping=aes(fill = stage),fun=mean,geom = "bar",fun.args = list(mult=1),width=0.7)+
+    stat_summary(fun.data=mean_sdl,fun.args = list(mult=0.3),geom="errorbar",width=0.2) +
+    labs(x=xlabel,y=ylabel)+
+    theme_classic()+
+    theme(legend.position="none",
+          axis.title.x = element_text(size=15),
+          axis.title.y = element_text(size=15),
+          axis.text = element_text(size = 12,colour="black"))+
+    guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
+}
+plotDot<-function(x,y, col,xlab,ylab,text.title=NA, withTest=FALSE){
+  model <- lm(y ~ x)
+  plot(x, y,col=col,pch=20,xlab=xlab,ylab=ylab)
+  abline(model, col="gray3")
+  if(!is.na(text.title)){
+    title(text.title)
+  }
+  x0<-max(x)*0.66
+  y0<-max(y)*0.66
+  if(withTest){
+    test<-cor.test(x,y, method = 'spearman')
+    # text(x0, y0, labels=sprintf('P-value=%.3f',test$p.value), pos=3)
+    text(x0, y0, labels=sprintf('R=%.2f',test$estimate))
+  }
+}
+
+getHeatmapAnnotatio<-function(sample){
+  column_annotation <-HeatmapAnnotation(
+    df=data.frame(Stage=sample$Group),
+    col = list(Stage =colorMapStage),
+    show_annotation_name =FALSE,
+    annotation_name_side='left'
+  )
+  column_annotation
+}
 ############################################################################################
 chromFactorLevel<-c('chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14',
      'chr15','chr16','chr17','chr18','chr19','chr20','chr21','chr22','chrX','chrY')
@@ -292,6 +348,9 @@ colorMapGroup<-c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd
 names(colorMapGroup)<-c('HypoInAIS','HyperInAIS','HypoInIMA','HyperInMIA','HypoInIAC','HyperInIAC')
 colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')
 names(colorMapStage)<-groupFactorLevel
+colorMapStage2<-c('green','cyan','orange','red')
+names(colorMapStage2)<-groupFactorLevel
+
 
 loadSRDMR<-function(){
   SRDMR<-loadData2(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.bed'),header = FALSE)
@@ -302,6 +361,11 @@ loadSRDAR<-function(){
   SRDAR<-loadData2(file.path(CONFIG$dataIntermediate,'atac', 'srdar.bed'),header = FALSE)
   colnames(SRDAR)<-c('chrom','start', 'end', 'class')
   SRDAR 
+}
+
+loadSRDEG<-function(){
+  SRDEG<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'srdeg.rds'))
+  SRDEG
 }
 #############################################################################################
 Group <- setRefClass(
@@ -337,9 +401,13 @@ Group <- setRefClass(
       tmp$Group<-factor(tmp$Group, levels = groupFactorLevel)
       tmp
     },
-    pickColumnsByGroup=function(groups, data) {
+    pickColumnsByGroup=function(groups, data, na.rm=FALSE) {
       tmp<-select(groups)
-      data[,match(tmp$SampleName, colnames(data))]
+      keep<-match(tmp$SampleName, colnames(data))
+      if (na.rm){
+        keep=na.omit(keep)
+      }
+      data[,keep]
     },
     getColorMapVec=function(){
       colorMapStage
@@ -384,4 +452,233 @@ saveCsv<-function(data, filename) {
 }
 ################################################################################################
 groups <- getGroups()
+################################################################################################
+RnaTPM <- setRefClass(
+  "RnaTPM",
+  fields = list(data = "data.frame", symbol='vector', ensemble='vector',sample='data.frame'),
+  methods = list(
+    initialize = function(batch='WGBS.RNA.ATAC') {
+      rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.wo.mt.rds'))
+      symbol<<-ensemble2Symbol3(rnaTPM$ensemble)
+      ensemble<<-rnaTPM$ensemble
+      data<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), rnaTPM)
+      sample<<-groups[[batch]]$selectBySample(colnames(data))
+    },
+    getTPM = function(geneSymbol, reshapeIfOneRow=TRUE, rmIfcontainNA=FALSE) {
+      out<-data[match(geneSymbol,symbol),]
+      if(nrow(out)==1){
+        if (reshapeIfOneRow){
+          unlist(out)
+        }else{
+          rownames(out)<-geneSymbol
+          out
+        }
+      }else{
+        if (any(duplicated(geneSymbol))){
+          rownames(out)<-NULL
+        }else{
+          rownames(out)<-geneSymbol
+        }
+        if(rmIfcontainNA){
+          keep<-apply(out, 1, function(x){
+            !(sum(is.na(x))>0)
+          })
+          out<-out[keep,]
+        }
+        out
+      }
+    },
+    plotStageBar=function(geneSymbol){
+      tpm<-getTPM(geneSymbol)
+      dataInput<-data.frame(
+        stage=sample$Group,
+        value=tpm
+      )
+      plotBarError(dataInput, xlabel=geneSymbol,ylabel="TPM")
+    },
+    plotStageHeatmap=function(geneSymbols, colAnno=TRUE, colNames=TRUE){
+      mm<-rnaTPM$getTPM(geneSymbols,reshapeIfOneRow=FALSE)
+      column_annotation=NULL
+      if(colAnno){
+        column_annotation <-HeatmapAnnotation(
+          df=data.frame(Stage=sample$Group),
+          col = list(Stage =colorMapStage),
+          show_annotation_name =FALSE,
+          annotation_name_side='left'
+        )
+      }
+      mm<-mm[!is.na(mm[,1]),]
+      Heatmap(t(scale(t(mm))),
+              cluster_rows=TRUE,
+              cluster_columns = FALSE,
+              show_row_names=TRUE,
+              show_column_names=colNames,
+              col=colorRamp2(c(-2, 0, 2), c("green3", "black", "red3")),
+              top_annotation = column_annotation
+      )
+    },
+    show = function() {
+      print(data)
+    }
+  )
+)
 
+
+AtacPeak <- setRefClass(
+  "AtacPeak",
+  fields = list(dataMethy = "data.frame",dataAllMethy = "data.frame",dataAccess='data.frame', feature='vector',sample='data.frame',batch='character'),
+  methods = list(
+    initialize = function(batchSelect='WGBS.RNA.ATAC') {
+      batch<<-batchSelect
+      atacPeakMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakMethyLevel.rds'))
+      atacPeakAllMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakAllMethyLevel.rds'))
+      atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'))
+      
+      dataAllMethy<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakAllMethyLevel,na.rm=TRUE)
+      dataMethy<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakMethyLevel,na.rm=TRUE)
+      dataAccess<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakTPM, na.rm = TRUE)
+      feature<<-bed2Feature(atacPeakTPM)
+      sample<<-groups[[batch]]$selectBySample(colnames(dataMethy))
+    },
+    getMatchData = function(peakFeature,group=NULL,doScale=FALSE) {
+      access<-getAccess(peakFeature,group,doScale)
+      methy<-getMethy(peakFeature,group,doScale)
+      if (length(peakFeature)>=2){
+        keep<-apply(methy, 1, function(x){
+          sum(x,na.rm = TRUE)!=0
+        })
+        access<-access[keep,]
+        methy<-methy[keep,]
+      }
+      list(
+        access=access,
+        methy=methy
+      )
+    },
+    getAccess = function(peakFeature, group=NULL,doScale=FALSE) {
+      getData(peakFeature, dataAccess,group=group,doScale=doScale)
+    },
+    getMethy = function(peakFeature, group=NULL,doScale=FALSE) {
+      getData(peakFeature, dataMethy,group=group,doScale=doScale)
+    },
+    getAllMethy = function(peakFeature, group=NULL,doScale=FALSE) {
+      getData(peakFeature, dataAllMethy,group=group,doScale=doScale)
+    },
+    getData = function(peakFeature,data, group=NULL,doScale=FALSE) {
+      out<-data[match(peakFeature,feature),]
+      if (doScale){
+        out<-t(scale(t(out)))
+      }
+      if(!is.null(group)) {
+        out<-out[,sample$Group%in%group]
+      }
+      if(nrow(out)==1){
+        unlist(out)
+      }else{
+        if (any(duplicated(peakFeature))){
+          rownames(out)<-NULL
+        }else{
+          rownames(out)<-peakFeature
+        }
+        out
+      }
+    },
+    plotCorAccessVsExpression=function(feature, gene, withTest=FALSE, featureTitle=FALSE){
+      epi<-getMatchData(c(feature))
+      rnaTPM<-RnaTPM()
+      rna<-rnaTPM$getTPM(gene)
+      if(featureTitle){
+        plotDot(epi$access, rna, sample$colors, 'Accessibility', 'TPM',feature,withTest=withTest)
+      }else{
+        plotDot(epi$access, rna, sample$colors, 'Accessibility', 'TPM',gene,withTest=withTest)
+      }
+    },
+    plotCorMethyVsExpression=function(feature, gene, withTest=FALSE, featureTitle=FALSE){
+      epi<-getMatchData(c(feature))
+      rnaTPM<-RnaTPM()
+      rna<-rnaTPM$getTPM(gene)
+      if(featureTitle){
+        plotDot(epi$methy, rna, sample$colors, 'Methylation', 'TPM',feature,withTest=withTest)
+      }else{
+        plotDot(epi$methy, rna, sample$colors, 'Methylation', 'TPM',gene,withTest=withTest)
+      }
+    },
+    show = function() {
+      print('AtacPeak')
+    }
+  )
+)
+MethyLevel <- setRefClass(
+  "MethyLevel",
+  fields = list(data = "data.frame",feature='vector',sample='data.frame'),
+  methods = list(
+    initialize = function(batch='WGBS') {
+      ratio<-readRDS(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.ratio.rds'))
+      feature<<-bed2Feature(ratio)
+      data<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), ratio)
+      sample<<-groups[[batch]]$selectBySample(colnames(data))
+      rownames(data)<<-feature
+    },
+    getMethy=function(selectFeature, rmIfcontainNA=FALSE){
+      out<-data[match(selectFeature, feature),]
+      if(rmIfcontainNA){
+        keep<-apply(out, 1, function(x){
+          !(sum(is.na(x))>0)
+        })
+      }else{
+        keep<-apply(out, 1, function(x){
+          sum(x,na.rm = TRUE)!=0
+        })
+      }
+      
+      out[keep,]
+    },
+    show = function() {
+      print(dim(data))
+    }
+  )
+)
+
+Srdeg <- setRefClass(
+  "Srdeg",
+  fields = list(deg = "list",dfs='data.frame'),
+  methods = list(
+    initialize = function() {
+      deg<<-loadSRDEG()
+    },
+    all = function(){
+      unique(unlist(deg$deg))
+    }
+  )
+)
+
+Survival <- setRefClass(
+  "Survival",
+  fields = list(os = "data.frame",dfs='data.frame'),
+  methods = list(
+    initialize = function() {
+      os<<-read.csv(file.path(CONFIG$dataIntermediate,'gepia2', 'table_survival.txt'),sep = '\t')
+      dfs<<-read.csv(file.path(CONFIG$dataIntermediate,'gepia2', 'table_df_survival.txt'),sep = '\t')
+    },
+    pickSurvival = function(genes) {
+      list(
+        os=intersect(genes, os$Gene.Symbol),
+        dfs=intersect(genes,dfs$Gene.Symbol)
+      )
+    },
+    pickSurvivalDeg = function(genes) {
+      srdeg<-loadSRDEG()
+      a<-lapply(srdeg$deg, function(x){
+        intersect(intersect(x, os$Gene.Symbol),genes)
+      })
+      b<-lapply(srdeg$deg, function(x){
+        intersect(intersect(x, dfs$Gene.Symbol),genes)
+      })
+      ret<-list()
+      list(
+        os=unlist(a)%>%unique(),
+        dfs=unlist(b)%>%unique()
+      )
+    }
+  )
+)
