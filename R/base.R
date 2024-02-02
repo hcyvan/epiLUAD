@@ -7,6 +7,7 @@ library(ggplot2)
 library(ChIPseeker)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(circlize)
+library(ape)
 
 configDefaultPath <- './config.default.yaml'
 configPath <- './config.yaml'
@@ -335,6 +336,14 @@ getHeatmapAnnotatio<-function(sample){
   )
   column_annotation
 }
+
+plotCircleCluster<-function(data, color){
+  dist_mm<-dist(t(data))
+  hclust_avg <- hclust(dist_mm, method = 'ward.D2')
+  phyl<-as.phylo(hclust_avg)
+  plot(phyl,type = "fan",show.tip.label=FALSE)
+  tiplabels(pch=21, col=color, bg=color, cex=0.4)
+}
 ############################################################################################
 chromFactorLevel<-c('chr1','chr2','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chr10','chr11','chr12','chr13','chr14',
      'chr15','chr16','chr17','chr18','chr19','chr20','chr21','chr22','chrX','chrY')
@@ -523,7 +532,6 @@ RnaTPM <- setRefClass(
   )
 )
 
-
 AtacPeak <- setRefClass(
   "AtacPeak",
   fields = list(dataMethy = "data.frame",dataAllMethy = "data.frame",dataAccess='data.frame', feature='vector',sample='data.frame',batch='character'),
@@ -533,12 +541,11 @@ AtacPeak <- setRefClass(
       atacPeakMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakMethyLevel.rds'))
       atacPeakAllMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakAllMethyLevel.rds'))
       atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'))
-      
       dataAllMethy<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakAllMethyLevel,na.rm=TRUE)
       dataMethy<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakMethyLevel,na.rm=TRUE)
       dataAccess<<-groups[[batch]]$pickColumnsByGroup(names(colorMapStage), atacPeakTPM, na.rm = TRUE)
       feature<<-bed2Feature(atacPeakTPM)
-      sample<<-groups[[batch]]$selectBySample(colnames(dataMethy))
+      sample<<-groups[[batch]]$selectBySample(colnames(dataAllMethy))
     },
     getMatchData = function(peakFeature,group=NULL,doScale=FALSE) {
       access<-getAccess(peakFeature,group,doScale)
@@ -561,16 +568,19 @@ AtacPeak <- setRefClass(
     getMethy = function(peakFeature, group=NULL,doScale=FALSE) {
       getData(peakFeature, dataMethy,group=group,doScale=doScale)
     },
-    getAllMethy = function(peakFeature, group=NULL,doScale=FALSE) {
-      getData(peakFeature, dataAllMethy,group=group,doScale=doScale)
+    getAllMethy = function(peakFeature, group=NULL,sampleName=NULL,doScale=FALSE) {
+      getData(peakFeature, dataAllMethy,group=group,sampleName=sampleName,doScale=doScale)
     },
-    getData = function(peakFeature,data, group=NULL,doScale=FALSE) {
+    getData = function(peakFeature,data, group=NULL,sampleName=NULL,doScale=FALSE) {
       out<-data[match(peakFeature,feature),]
       if (doScale){
         out<-t(scale(t(out)))
       }
       if(!is.null(group)) {
         out<-out[,sample$Group%in%group]
+      }
+      if(!is.null(sampleName)) {
+        out<-out[,match(sampleName, sample$SampleName)]
       }
       if(nrow(out)==1){
         unlist(out)

@@ -9,7 +9,7 @@ library(MASS)
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3I. Common DARs and SCDMRs Homer TFs: EpiTFs
+# Figure 3I. Common SRDARs and SRDMRs Homer TFs: EpiTFs
 #----------------------------------------------------------------------------------------------------------------------
 srdmrTFs<-readRDS(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
 srdarTFs<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
