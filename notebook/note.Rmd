@@ -45,4 +45,26 @@ python ./script/dmc2dmr.py -i ./data/intermediate/srdmc.s2.bed -o ./data/interme
 findMotifsGenome.pl ../srdmr.HypoInIAC.bed hg38 ./HypoInIAC -mask
 ```
 ## bigwig
+use deeptools to merge bigwig
+```{bash}
 bigwigAverage -b CTL_41.bigwig CTL_64.bigwig CTL_74.bigwig CTL_78.bigwig -o CTL.2.bw
+```
+
+## Methylatio Chip
+```{R}
+library(ChAMP)
+# http://www.bio-info-trainee.com/2823.html
+testDir<-file.path(CONFIG$dataExternal,'GSE122126/GSE122126_lung')
+myLoad <- champ.load(testDir, arraytype="EPIC")
+champ.QC()
+myNorm<-champ.norm(arraytype="EPIC")
+myDMP <- champ.DMP(arraytype="EPIC")
+myDMP <- champ.DMR(arraytype = "EPIC",cores=8)
+myBlock <- champ.Block(arraytype = "EPIC")
+saveRDS(myLoad$beta, file.path(CONFIG$dataIntermediate,'open', 'GSE122126_epic.beta.rds'))
+saveRDS(myNorm, file.path(CONFIG$dataIntermediate,'open', 'GSE122126_epic.beta.nrom.rds'))
+saveRDS(myDMP, file.path(CONFIG$dataIntermediate,'open', 'GSE122126_epic.dmp.rds'))
+saveRDS(myDMR, file.path(CONFIG$dataIntermediate,'open', 'GSE122126_epic.dmr.rds'))
+```
+
+
