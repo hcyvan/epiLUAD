@@ -31,26 +31,33 @@ cat(sprintf("SRDMR: %s; SRDAR: %s; Overlap: %s", dmrNum, darNum, overlapNum))
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-AtacPeak('WGBS.ATAC')
 methyLevel<-MethyLevel('WGBS.ATAC')
-darDmrOverlap<-loadData2(file.path(CONFIG$dataIntermediate,'panel', 'darDmrOverlap.bed'))
+darDmrOverlap<-loadData2(file.path(CONFIG$dataIntermediate,'marker', 'darDmrOverlap.bed'))
 mmDmr<-methyLevel$getMethy(darDmrOverlap$dmr, rmIfcontainNA = TRUE)
 mmDarMethy<-atacPeak$getMatchData(darDmrOverlap$dar)$methy
+mmDarAccess<-atacPeak$getMatchData(darDmrOverlap$dar)$access
 pDmr<-Heatmap(mmDmr,
-              name='SRDMR',
+              name='SRDMR Methylation Level',
               top_annotation = getHeatmapAnnotatio(atacPeak$sample),
               cluster_rows=TRUE,
               cluster_columns = TRUE,
               show_row_names=FALSE,
               show_column_names=FALSE)
 
-
-pDar<-Heatmap(mmDarMethy,
-              name='SRDAR',
+pDarMethy<-Heatmap(mmDarMethy,
+              name='SRDAR Methylation Level',
               cluster_rows=TRUE,
               cluster_columns = TRUE,
               show_row_names=FALSE,
               show_column_names=FALSE)
-saveImage2("marker.dar.dmr.heatmap.pdf",width = 5,height = 3)
-pDmr%v%pDar
+pDarAccess<-Heatmap(t(scale(t(mmDarAccess))),
+              name='SRDAR Accessibility',
+              col = colorRamp2(c(-1, 0, 1), c("blue", "black", "yellow3")),
+              cluster_rows=TRUE,
+              cluster_columns = TRUE,
+              show_row_names=FALSE,
+              show_column_names=FALSE)
+saveImage2("marker.dar.dmr.heatmap.pdf",width = 9,height = 5)
+pDmr%v%pDarMethy%v%pDarAccess
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 6C. Cluster of patients with DAR methylation level
@@ -114,7 +121,7 @@ saveImage2("marker.dardmr.clincal.survplot.pdf",width = 3.5,height = 3.5)
 ggsurvplot(fit,pval=T)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 6F,G. 
+# Figure 6F,G. ROC curve of Random Forest Modeling
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-AtacPeak('WGBS')
 darDmrOverlap<-loadData2(file.path(CONFIG$dataIntermediate,'marker', 'darDmrOverlap.bed'))
@@ -126,7 +133,7 @@ saveTsv(rownames(wgbs), file.path(CONFIG$dataIntermediate,'marker', 'wgbs.featur
 # Random forest modeling using python sklearn
 # ./doc/marker.ipynb
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S4A,B
+# Figure S4A,B Random Forest Modeling of TCGA LUAD
 #----------------------------------------------------------------------------------------------------------------------
 dataClinical<-loadData2(file.path(CONFIG$dataIntermediate,'marker', 'tcgaLUAD450kClinical.tsv'),force.refresh = TRUE)
 atacPeak<-AtacPeak('WGBS')
@@ -145,7 +152,7 @@ dev.off()
 # Random forest modeling using python sklearn
 # ./doc/marker.ipynb
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 6H.
+# Figure 6H. methyltion level of important site of TCGA LUAD select by random forest
 #----------------------------------------------------------------------------------------------------------------------
 HM450kTCGAforModel<-readRDS(file.path(CONFIG$dataIntermediate,'marker', 'HM450kTCGAforModel.rds'))
 hm450kClass2<-loadData2(file.path(CONFIG$dataIntermediate,'marker', 'HM450k.featureImportance.class2.csv'),force.refresh = TRUE)
@@ -164,14 +171,13 @@ Heatmap(t(scale(t(mm))),
         name='Scaled Mehtylation Level',
         top_annotation = column_annotation,
         clustering_method_columns = 'ward.D',
-        # clustering_method_rows = 'ward.D2',
         cluster_rows=TRUE,
         cluster_columns = TRUE,
         show_row_names=FALSE,
         show_column_names=FALSE)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 6I.
+# Figure 6I. Methylation level in 1416 regions of healthy and lung cancer cfDNA (GSE122126)
 #----------------------------------------------------------------------------------------------------------------------
 darDmrHM450Overlap<-loadData2(file.path(CONFIG$dataIntermediate,'marker', 'darDmrHM450Overlap.bed'))
 myDMP<-readRDS(file.path(CONFIG$dataIntermediate,'open', 'GSE122126_epic.dmp.rds'))
