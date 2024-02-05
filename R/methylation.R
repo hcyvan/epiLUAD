@@ -182,6 +182,35 @@ plot.group.methy.profile(2000, 3000,file.path(CONFIG$dataIntermediate, "signalRo
 dev.off()
 
 #----------------------------------------------------------------------------------------------------------------------
+# Table S2. Summary of clinical characteristics associated with different subtypes of LUAD				
+#----------------------------------------------------------------------------------------------------------------------
+clinicalData<-read.csv(file.path(CONFIG$dataExternal,'supplytable1.csv'),fileEncoding = "GB2312")
+data<-clinicalData%>%dplyr::select(SampleName,Group,Age, Sex, Smoking=Smoke_history)
+# Age
+## Kruskal-Wallis H test
+kruskal.test(Age ~ Group, data = data)
+## Statistical parameters: median and IQR
+group_by(data, Group) %>% summarise(median = median(Age),IQR = IQR(Age))
+# Smoking
+## two-way Chi-squared test
+car.data<-data.frame(data$Group, data$Smoking)
+target <- table(car.data)
+chisq.test(target)
+print(target)
+
+# Sex
+## two-way Chi-squared test
+car.data<-data.frame(data$Group, data$Sex)
+target <- table(car.data)
+chisq.test(target)
+print(target)
+
+data <- filter(data, Group!='CTL')
+car.data<-data.frame(data$Group, data$Sex)
+target <- table(car.data)
+chisq.test(target)
+print(target)
+#----------------------------------------------------------------------------------------------------------------------
 # Table S5. Hyper-DMCs and Hypo-DMCs of different group in LUAD				
 #----------------------------------------------------------------------------------------------------------------------
 dmcCTLvsAIS<-loadData2(file.path(CONFIG$dataExternal,'dmc', 'dmc.CTL.vs.AIS.txt'),file.format='bed')
