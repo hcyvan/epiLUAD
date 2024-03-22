@@ -532,8 +532,8 @@ plot.scdmr.status<-function(srdmr.type){
   data<-data.frame(x=gr$length, y=gr$cpg)
   p_scatter <- ggplot(data, aes(x = x, y = y)) +
     geom_point(size=0.3,alpha = 0.6) +
-    xlab("SC-DMR size (bp)")+
-    ylab("SC-DMR Number")+
+    xlab("SRDMR size (bp)")+
+    ylab("SRDMR Number")+
     ggtitle(srdmr.type)+
     theme_bw()
   p<-ggMarginal(p_scatter, type="histogram",fill='white',bins = 100,size = 8)
