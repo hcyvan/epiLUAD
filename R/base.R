@@ -24,9 +24,6 @@ CONFIG['dataAnnotation']<-'./data/annotation'
 CONFIG['dataIntermediate']<-'./data/intermediate'
 CONFIG['dataExternal']<-'./data/external'
 CONFIG['dataResult']<-'./data/result'
-
-DATA_DIR <- CONFIG$dataDir
-IMAGE_DIR <- CONFIG$imageDir
 ########################################### helper function ###########################################
 annoPeak<-function(peakGr) {
   peakAnno <- annotatePeak(peakGr, tssRegion = c(-5000, 5.000), TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene)
@@ -210,9 +207,9 @@ removeNegativeOne <- function(m){
 }
 
 loadData <- function(name, ext="csv", header=FALSE, force.refresh=FALSE){
-  ext.path <- paste(file.path(DATA_DIR, name),ext,sep = '.')
-  rds.path <- paste(file.path(DATA_DIR, name),'rds',sep = '.')
-  rds.external.path <- paste(file.path(DATA_DIR, 'external', name),'rds',sep = '.')
+  ext.path <- paste(file.path(CONFIG$dataDir, name),ext,sep = '.')
+  rds.path <- paste(file.path(CONFIG$dataDir, name),'rds',sep = '.')
+  rds.external.path <- paste(file.path(CONFIG$dataDir, 'external', name),'rds',sep = '.')
   if(file.exists(rds.path) && !force.refresh){
     readRDS(rds.path)
   }else if(file.exists(ext.path)) {
@@ -440,7 +437,7 @@ getGroups <- function() {
 }
 
 saveImage <- function(file,...){
-  file.path=file.path(IMAGE_DIR, file)
+  file.path=file.path(CONFIG$imageDir, file)
   if (endsWith(file, '.pdf')){
     pdf(file=file.path, ...)
   }
