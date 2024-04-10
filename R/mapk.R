@@ -25,6 +25,7 @@ plotFeatureRCircos<-function(features){
     Gene=diff$symbol
   )
   dfDiff<-distinct(dfDiff,Gene,.keep_all = TRUE)
+  saveRDS(dfDiff, file.path(CONFIG$dataIntermediate,'mapk', 'ap1.targets.rds'))
   data1<-atacPeak$getMatchData(features, 'CTL')
   data2<-atacPeak$getMatchData(features, 'AIS')
   data3<-atacPeak$getMatchData(features, 'MIA')
@@ -65,14 +66,14 @@ plotFeatureRCircos<-function(features){
     RC.param <- RCircos.Get.Plot.Parameters()
     RC.param['hist.color'] <- colorMapStage2[i]
     RCircos.Reset.Plot.Parameters(RC.param)
-    RCircos.Histogram.Plot(df[[i]], 4,i, 'in', 1);
+    RCircos.Histogram.Plot(df[[i]], 4,i, 'in', 1); # methy
   }
   
   for(i in 1:4){
     RC.param <- RCircos.Get.Plot.Parameters()
     RC.param['hist.color'] <- colorMapStage2[i]
     RCircos.Reset.Plot.Parameters(RC.param)
-    RCircos.Histogram.Plot(df[[i]], 5,i, 'out', 1)
+    RCircos.Histogram.Plot(df[[i]], 5,i, 'out', 1) # access
   }
   RCircos.Gene.Connector.Plot(dfDiff, 5, 'out')
   RC.param <- RCircos.Get.Plot.Parameters()
@@ -81,7 +82,7 @@ plotFeatureRCircos<-function(features){
   RCircos.Gene.Name.Plot(dfDiff, 4,6, 'out')
 }
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 7B. mapk deg
+# Figure 7A. mapk deg
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
 saveImage2("rna.mapk.up.heatmap.pdf",width = 8,height = 4)
@@ -99,7 +100,7 @@ p4<-rnaTPM$plotStageHeatmap(mapkGenes$kinase, colAnno = FALSE,colNames = FALSE)
 p1%v%p2%v%p3%v%p4
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 7C. MAPK activity
+# Figure S5B. barplot of MMP3 and MMP13
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
 p1<-rnaTPM$plotStageBar('FOS')
@@ -110,7 +111,7 @@ saveImage2("rna.mapk.target.barplot.pdf",width = 5,height = 3.5)
 grid.arrange(p1,p2,p3,p4,nrow=2)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 7D. AP1 target
+# Figure 7B. DEGs regulated by AP-1 in SRDARs
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-AtacPeak()
 rnaTPM<-RnaTPM()
@@ -147,7 +148,7 @@ saveImage2("rna.ap1.target.circle.pdf",width = 5,height = 5)
 plotFeatureRCircos(featureAP1)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 7F. Peak Accessibility/Methylation vs. gene expression TPM
+# Figure S5D. Peak Accessibility/Methylation vs. gene expression TPM
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-AtacPeak()
 saveImage2("gene.access.methy.tpm.met.egfr.fgfbp1.scatter.pdf",width = 3.5,height = 6)
@@ -160,11 +161,13 @@ atacPeak$plotCorAccessVsExpression('chr4:15938055-15938795', 'FGFBP1',withTest =
 atacPeak$plotCorMethyVsExpression('chr4:15938055-15938795', 'FGFBP1',withTest = TRUE)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S5C. AP-1 target gene which is related to survival
+# Figure S5F-I. barplot of AP-1 target gene
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
-p1<-rnaTPM$plotStageBar('EFNA5')
-p2<-rnaTPM$plotStageBar('PERP')
-saveImage2("rna.mapk.ap1.target.efna5,perp.barplot.pdf",width = 5,height = 3.5)
-grid.arrange(p1,p2,nrow=2, ncol=2)
+p1<-rnaTPM$plotStageBar('EGFR')
+p2<-rnaTPM$plotStageBar('FGFBP1')
+p3<-rnaTPM$plotStageBar('EFNA5')
+p4<-rnaTPM$plotStageBar('PERP')
+saveImage2("rna.mapk.ap1.target.egfr_fgfbp1_efna5_perp.barplot.pdf",width = 5,height = 3.5)
+grid.arrange(p1,p2,p3,p4,nrow=2, ncol=2)
 dev.off()

@@ -494,12 +494,16 @@ RnaTPM <- setRefClass(
         out
       }
     },
-    plotStageBar=function(geneSymbol){
+    getTPMDataForStageBar=function(geneSymbol){
       tpm<-getTPM(geneSymbol)
       dataInput<-data.frame(
         stage=sample$Group,
         value=tpm
       )
+      dataInput
+    },
+    plotStageBar=function(geneSymbol){
+      dataInput<-getTPMDataForStageBar(geneSymbol)
       plotBarError(dataInput, xlabel=geneSymbol,ylabel="TPM")
     },
     plotStageHeatmap=function(geneSymbols, colAnno=TRUE, colNames=TRUE){
