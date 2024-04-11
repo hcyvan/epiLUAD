@@ -25,7 +25,7 @@ drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
 }
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 1A: The Average DNA methylation level of samples in each group
+# Figure 1B: The Average DNA methylation level of samples in each group
 #----------------------------------------------------------------------------------------------------------------------
 tableS3 <- read_excel(file.path(CONFIG$dataExternal, 'SupplementaryData.xlsx'),sheet = 'Table S3')
 
@@ -55,7 +55,7 @@ ggplot(data=data,aes(x=group,y=ratio,fill=group))+
   guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 1B: The methylation level density distribution of CTL vs. AIS, CTL vs. MIA and CTL vs. IAC
+# Figure 1C: The methylation level density distribution of CTL vs. AIS, CTL vs. MIA and CTL vs. IAC
 #----------------------------------------------------------------------------------------------------------------------
 ratio <- loadData2(file.path(CONFIG$dataExternal, 'LAD.group.ratio.bed'))
 ratio<-removeNegativeOne(ratio)
@@ -67,7 +67,7 @@ drawDensity(ratio$CTL, ratio$MIA, "CTL", "MIA")
 drawDensity(ratio$CTL, ratio$IAC, "CTL", "IAC")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 1C: The Average DNA methylation level of some Genomic Regions
+# Figure 1D: The Average DNA methylation level of some Genomic Regions
 #----------------------------------------------------------------------------------------------------------------------
 genomicRegionMethyLevel<-readRDS(file.path(CONFIG$dataExternal, 'genomicRegionMethyLevel.rds'))
 m<-do.call(rbind,lapply(genomicRegionMethyLevel, function(x){
@@ -118,7 +118,7 @@ genomicRegionStatistic<-do.call(rbind,lapply(1:nrow(m),function(i){
 }))
 write.csv(genomicRegionStatistic, file.path(CONFIG$dataResult, 'genomicRegionStatistic.csv'),row.names  = FALSE,quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 1D. Methylation level of CpGs within 5,000 bp upstream and downstream relative to TSS
+# Figure 1E. Methylation level of CpGs within 5,000 bp upstream and downstream relative to CGI and TSS
 #----------------------------------------------------------------------------------------------------------------------
 smooth2 <- function(hw=51) {
   function(arr){

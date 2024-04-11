@@ -103,12 +103,10 @@ dev.off()
 # Figure S5B. barplot of MMP3 and MMP13
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
-p1<-rnaTPM$plotStageBar('FOS')
-p2<-rnaTPM$plotStageBar('JUN')
-p3<-rnaTPM$plotStageBar('MMP3')
-p4<-rnaTPM$plotStageBar('MMP13')
-saveImage2("rna.mapk.target.barplot.pdf",width = 5,height = 3.5)
-grid.arrange(p1,p2,p3,p4,nrow=2)
+p1<-rnaTPM$plotStageBar('MMP3')
+p2<-rnaTPM$plotStageBar('MMP7')
+saveImage2("rna.mapk.mmp3.mmp7.barplot.pdf",width = 4,height = 3.5)
+grid.arrange(p1,p2,nrow=1)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 7B. DEGs regulated by AP-1 in SRDARs
