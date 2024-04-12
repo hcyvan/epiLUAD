@@ -131,25 +131,53 @@ summary(aov(y~group,data=data))
 # Figure 7F. DEGs in IAC and A549 with T-5224
 #----------------------------------------------------------------------------------------------------------------------
 deg<-loadSRDEG()
-diff<-inner_join(diff.0.vs.100, deg$detail$IAC, by='genes')
-uu<-filter(diff, logFC.x>0,logFC.y>0)%>%nrow
-dd<-filter(diff, logFC.x<0,logFC.y<0)%>%nrow
-ud<-filter(diff, logFC.x>0,logFC.y<0)%>%nrow
-du<-filter(diff, logFC.x<0,logFC.y>0)%>%nrow
-cat(paste('uu', uu))
-cat(paste('dd', dd))
-cat(paste('ud', ud))
-cat(paste('du', du))
 
-diff<-inner_join(diff.0.vs.200, deg$detail$IAC, by='genes')
-uu<-filter(diff, logFC.x>0,logFC.y>0)%>%nrow
-dd<-filter(diff, logFC.x<0,logFC.y<0)%>%nrow
-ud<-filter(diff, logFC.x>0,logFC.y<0)%>%nrow
-du<-filter(diff, logFC.x<0,logFC.y>0)%>%nrow
-cat(paste('uu', uu))
-cat(paste('dd', dd))
-cat(paste('ud', ud))
-cat(paste('du', du))
+diff.inter<-function(diffA549){
+  diff<-inner_join(diffA549, deg$detail$IAC, by='genes')
+  uu<-filter(diff, logFC.x>0,logFC.y>0)%>%nrow
+  dd<-filter(diff, logFC.x<0,logFC.y<0)%>%nrow
+  ud<-filter(diff, logFC.x>0,logFC.y<0)%>%nrow
+  du<-filter(diff, logFC.x<0,logFC.y>0)%>%nrow
+  
+  duDetail<-filter(diff, logFC.x<0,logFC.y>0)
+  udDetail<-filter(diff, logFC.x>0,logFC.y<0)
+  
+  df<-data.frame(UpA549=c(uu, ud), DownA549=c(du, dd))
+  rownames(df) = c('UpIAC', 'DownIAC')
+  print(df)
+  out<-list(
+    stat=df,
+    detail=list(
+      DownA549UpIAC=duDetail,
+      UpA549DownIAC=udDetail,
+      ALL=rbind(udDetail, duDetail)
+    )
+  )
+  out
+}
+
+diff100<-diff.inter(diff.0.vs.100)
+diff200<-diff.inter(diff.0.vs.200)
+
+
+GO100<-doErich(diff100$detail$ALL$genes,0.05,0.05)
+GO200<-doErich(diff200$detail$ALL$genes,0.05,0.05)
+GO100Up<-doErich(diff100$detail$UpA549DownIAC$genes,0.05,0.05)
+GO100Down<-doErich(diff100$detail$DownA549UpIAC$genes,0.05,0.05)
+GO200Up<-doErich(diff200$detail$UpA549DownIAC$genes,0.05,0.05)
+GO200Down<-doErich(diff200$detail$DownA549UpIAC$genes,0.05,0.05)
+
+barplot(GO100$cc)
+barplot(GO100$mf)
+barplot(GO100$bp)
+barplot(GO100$kegg)
+
+barplot(GO200$cc)
+barplot(GO200$mf)
+saveImage2("rna.deg.a549.t5224.interIAC.go.bp.pdf",width = 5,height = 1)
+barplot(GO200$bp)+theme_classic()
+dev.off()
+barplot(GO200$kegg)
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S5G. MMP3 and MMP7 in a549 cell line treated with different concentrations of T5224
 #----------------------------------------------------------------------------------------------------------------------

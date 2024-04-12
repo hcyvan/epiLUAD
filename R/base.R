@@ -8,6 +8,8 @@ library(ChIPseeker)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(circlize)
 library(ape)
+library(clusterProfiler)
+library(org.Hs.eg.db)
 
 configDefaultPath <- './config.default.yaml'
 configPath <- './config.yaml'
@@ -267,6 +269,50 @@ loadData2<-function(filename, file.format=NULL, force.refresh=FALSE, header=TRUE
       data
     }
   }
+}
+
+doErich<-function(genes,pvalueCutoff=0.005, qvalueCutoff=0.005, do.simplify=TRUE){
+  pcg = bitr(genes, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+  ego.CC <- enrichGO(gene          = pcg$ENTREZID,
+                     OrgDb         = org.Hs.eg.db,
+                     ont           = "CC",
+                     pvalueCutoff  = pvalueCutoff,
+                     qvalueCutoff  = qvalueCutoff,
+                     readable      = TRUE)
+  ego.MF <- enrichGO(gene          = pcg$ENTREZID,
+                     OrgDb         = org.Hs.eg.db,
+                     ont           = "MF",
+                     pvalueCutoff  = pvalueCutoff,
+                     qvalueCutoff  = qvalueCutoff,
+                     readable      = TRUE)
+  ego.BP <- enrichGO(gene          = pcg$ENTREZID,
+                     OrgDb         = org.Hs.eg.db,
+                     ont           = "BP",
+                     pvalueCutoff  = pvalueCutoff,
+                     qvalueCutoff  = qvalueCutoff,
+                     readable      = TRUE)
+  
+  kegg <- enrichKEGG(gene         = pcg$ENTREZID,
+                     organism     = 'hsa',
+                     pAdjustMethod = "BH",
+                     pvalueCutoff  = pvalueCutoff,
+                     qvalueCutoff  = qvalueCutoff)
+  if (do.simplify){
+    ego<-list(
+      cc=simplify(ego.CC,cutoff=0.7, by="p.adjust", select_fun=min),
+      mf=simplify(ego.MF,cutoff=0.7, by="p.adjust", select_fun=min),
+      bp=simplify(ego.BP,cutoff=0.7, by="p.adjust", select_fun=min),
+      kegg=kegg
+    )
+  }else {
+    ego<-list(
+      cc=ego.CC,
+      mf=ego.MF,
+      bp=ego.BP,
+      kegg=kegg
+    )
+  }
+  ego
 }
 ########################################### plot function ###########################################
 plotEnrich<-function(term, qval,title=""){

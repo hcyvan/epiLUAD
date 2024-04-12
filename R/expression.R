@@ -12,8 +12,6 @@ library(reshape2)
 library(ggExtra)
 library(gridExtra)
 library(ggpubr)
-library(clusterProfiler)
-library(org.Hs.eg.db)
 #----------------------------------------------------------------------------------------------------------------------
 # RNA-seq: Differential Expression Analysis
 #----------------------------------------------------------------------------------------------------------------------
@@ -213,45 +211,9 @@ dev.off()
 # Figure 4D,E,F DEGs Enrichment Analysis
 #----------------------------------------------------------------------------------------------------------------------
 degStage<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.stage.rds'))
-doErich<-function(genes){
-  pcg = bitr(genes, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
-  ego.CC <- enrichGO(gene          = pcg$ENTREZID,
-                     OrgDb         = org.Hs.eg.db,
-                     ont           = "CC",
-                     pvalueCutoff  = 0.005,
-                     qvalueCutoff  = 0.005,
-                     readable      = TRUE)
-  ego.MF <- enrichGO(gene          = pcg$ENTREZID,
-                     OrgDb         = org.Hs.eg.db,
-                     ont           = "MF",
-                     pvalueCutoff  = 0.005,
-                     qvalueCutoff  = 0.005,
-                     readable      = TRUE)
-  ego.BP <- enrichGO(gene          = pcg$ENTREZID,
-                     OrgDb         = org.Hs.eg.db,
-                     ont           = "BP",
-                     pvalueCutoff  = 0.005,
-                     qvalueCutoff  = 0.005,
-                     readable      = TRUE)
-  
-  kegg <- enrichKEGG(gene         = pcg$ENTREZID,
-                           organism     = 'hsa',
-                           pAdjustMethod = "BH",
-                           pvalueCutoff  = 0.005,
-                           qvalueCutoff  = 0.005)
-  
-  ego<-list(
-    cc=simplify(ego.CC,cutoff=0.7, by="p.adjust", select_fun=min),
-    mf=simplify(ego.MF,cutoff=0.7, by="p.adjust", select_fun=min),
-    bp=simplify(ego.BP,cutoff=0.7, by="p.adjust", select_fun=min),
-    kegg=kegg
-  )
-  ego
-}
 goAIS<-doErich(degStage$AIS)
 goMIA<-doErich(degStage$MIA)
 goIAC<-doErich(degStage$IAC)
-
 
 outputGo<-function(go,out){
   enrich<-head(go,n=1000)
