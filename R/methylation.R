@@ -572,8 +572,9 @@ saveRDS(srdmrTFs,file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
 srdmrTFs<-readRDS(file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
 TFS<-dplyr::arrange(srdmrTFs$stage, desc(HyperInAIS),desc(HypoInAIS),desc(HyperInMIA),desc(HypoInMIA),desc(HyperInIAC),desc(HypoInIAC))
 m<-as.matrix(TFS)
+
 column_annotation <-HeatmapAnnotation(
-  df=data.frame(SRDMR=names(colorMapGroup)),
+  df=data.frame(SRDMR=factor(colnames(m), levels = colnames(m))),
   col = list(SRDMR =colorMapGroup),
   show_annotation_name =FALSE,
   annotation_name_side='left'

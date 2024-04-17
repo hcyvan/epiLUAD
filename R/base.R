@@ -365,6 +365,7 @@ plotDot<-function(x,y, col,xlab,ylab,text.title=NA, withTest=FALSE){
   y0<-max(y)*0.66
   if(withTest){
     test<-cor.test(x,y, method = 'spearman')
+    print(test)
     # text(x0, y0, labels=sprintf('P-value=%.3f',test$p.value), pos=3)
     text(x0, y0, labels=sprintf('R=%.2f',test$estimate))
   }
@@ -397,7 +398,7 @@ gonomicRegionFactorLevel<-c('cgIslands', 'cgShores', 'cgShelves', 'cgSea',
 colorMapDAR <- c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd")
 names(colorMapDAR)<-c('AISHypoDARs','AISHyperDARs','MIAHypoDARs','MIAHyperDARs','IACHypoDARs','IACHyperDARs')
 colorMapGroup<-c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd")
-names(colorMapGroup)<-c('HypoInAIS','HyperInAIS','HypoInIMA','HyperInMIA','HypoInIAC','HyperInIAC')
+names(colorMapGroup)<-c('HypoInAIS','HyperInAIS','HypoInMIA','HyperInMIA','HypoInIAC','HyperInIAC')
 colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')
 names(colorMapStage)<-groupFactorLevel
 colorMapStage2<-c('green','cyan','orange','red')

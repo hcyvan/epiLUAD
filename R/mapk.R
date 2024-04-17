@@ -100,7 +100,7 @@ p4<-rnaTPM$plotStageHeatmap(mapkGenes$kinase, colAnno = FALSE,colNames = FALSE)
 p1%v%p2%v%p3%v%p4
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S5B. barplot of MMP3 and MMP13
+# Figure S5B. barplot of MMP3 and MMP7
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
 p1<-rnaTPM$plotStageBar('MMP3')
@@ -141,22 +141,24 @@ chipseqJUN=file.path(CONFIG$dataIntermediate, 'mapk','JUN_ENCFF280RQS.bed')
 featureFOS<-getFeatures('FOS', chipseqFOS)
 featureJUN<-getFeatures('JUN', chipseqJUN)
 featureAP1<-unique(union(featureFOS, featureJUN)) # 819 AP-1 binding region
-
 saveImage2("rna.ap1.target.circle.pdf",width = 5,height = 5)
 plotFeatureRCircos(featureAP1)
 dev.off()
+
+region<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.DAR.rds'))
+length(unique(region$feature))
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S5D. Peak Accessibility/Methylation vs. gene expression TPM
 #----------------------------------------------------------------------------------------------------------------------
 atacPeak<-AtacPeak()
 saveImage2("gene.access.methy.tpm.met.egfr.fgfbp1.scatter.pdf",width = 3.5,height = 6)
 par(mfrow=c(3,2))
-atacPeak$plotCorAccessVsExpression('chr7:116671720-116673040', 'MET',withTest = TRUE,featureTitle = TRUE)#*
-atacPeak$plotCorMethyVsExpression('chr7:116671720-116673040', 'MET',withTest = TRUE)
-atacPeak$plotCorAccessVsExpression('chr7:55018238-55020917', 'EGFR',withTest = TRUE,featureTitle = TRUE)
-atacPeak$plotCorMethyVsExpression('chr7:55018238-55020917', 'EGFR',withTest = TRUE)#*
-atacPeak$plotCorAccessVsExpression('chr4:15938055-15938795', 'FGFBP1',withTest = TRUE,featureTitle = TRUE)
-atacPeak$plotCorMethyVsExpression('chr4:15938055-15938795', 'FGFBP1',withTest = TRUE)
+atacPeak$plotCorAccessVsExpression('chr7:116671720-116673040', 'MET',featureTitle = TRUE)#*
+atacPeak$plotCorMethyVsExpression('chr7:116671720-116673040', 'MET')
+atacPeak$plotCorAccessVsExpression('chr7:55018238-55020917', 'EGFR',featureTitle = TRUE)
+atacPeak$plotCorMethyVsExpression('chr7:55018238-55020917', 'EGFR')#*
+atacPeak$plotCorAccessVsExpression('chr4:15936349-15936998', 'FGFBP1',featureTitle = TRUE)
+atacPeak$plotCorMethyVsExpression('chr4:15936349-15936998', 'FGFBP1')
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S5F-I. barplot of AP-1 target gene

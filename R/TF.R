@@ -55,7 +55,7 @@ saveRDS(epiTFsAllRegion,file.path(CONFIG$dataIntermediate, 'atac','homer.mask','
 out<-data.frame(feature2Bed(epiTFsAllRegion$feature), tf=epiTFsAllRegion$tf)
 saveTsv(out, file.path(CONFIG$dataIntermediate, 'atac','homer.mask','all.motif.region.mask.given.bed'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 3J. Figure S3B. EpiTFs heatmap
+# Figure 3J. EpiTFs heatmap
 #----------------------------------------------------------------------------------------------------------------------
 epiTFsDAR<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.DAR.rds'))
 epiTFsAllRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.AllR.rds'))
@@ -237,9 +237,9 @@ cluster<-doCluster(mmRatio,k=6)
 saveImage2("tf.epiTFs.srdar.cluster.heatmap.pvalue.pdf",width = 7,height = 6)
 plotTFClusterHeatmapLogP(mmLogP)
 dev.off()
-saveImage2("tf.epiTFs.srdar.cluster.heatmap.log2fc.pdf",width = 7,height = 6)
-plotTFClusterHeatmapLogFC(mmLogFC)#Figure S3B
-dev.off()
+# saveImage2("tf.epiTFs.srdar.cluster.heatmap.log2fc.pdf",width = 7,height = 6)
+# plotTFClusterHeatmapLogFC(mmLogFC)#Figure S3B
+# dev.off()
 saveImage2("tf.epiTFs.srdar.cluster.heatmap.ratio.pdf",width = 7,height = 6)
 plotTFClusterHeatmapRatio2(mmRatio, mmLogFCMean, cluster)#Figure 3J
 dev.off()

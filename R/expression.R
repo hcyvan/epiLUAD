@@ -174,7 +174,7 @@ dev.off()
 
 
 #----------------------------------------------------------------------------------------------------------------------
-# Figure S3C Expression of significant differential expression epiTFs
+# Figure S3B Expression of significant differential expression epiTFs
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
 epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))

@@ -375,7 +375,7 @@ srdarTFs<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
 TFS<-dplyr::arrange(srdarTFs$stage, desc(HyperInAIS),desc(HypoInAIS),desc(HyperInMIA),desc(HypoInMIA),desc(HyperInIAC),desc(HypoInIAC))
 m<-as.matrix(TFS)
 column_annotation <-HeatmapAnnotation(
-  df=data.frame(SRDAR=names(colorMapGroup)),
+  df=data.frame(SRDAR=factor(colnames(m), levels = colnames(m))),
   col = list(SRDAR =colorMapGroup),
   show_annotation_name =FALSE,
   annotation_name_side='left'
