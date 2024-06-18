@@ -71,7 +71,7 @@ ensemble2Symbol3<-function(ensemble,keepIfNotMatch=FALSE){
   })
 }
 
-homerKnownTFs<-function(dir,stage='LUAD',cutoff=0.001){
+homerKnownTFs<-function(dir,stage='LUAD',cutoff=0.001, logP=FALSE){
   result.txt<-file.path(dir,'knownResults.txt')
   result<-read.csv(result.txt,sep='\t')
   result<-result[result$q.value..Benjamini.< 0.02,]
@@ -80,10 +80,12 @@ homerKnownTFs<-function(dir,stage='LUAD',cutoff=0.001){
     c(strsplit(x,"\\(")[[1]][1])
   })
   out<-data.frame(tf=homer, motif=names(homer),class=stage)
+  if(logP){
+    out$logP<-result$Log.P.value
+  }
   rownames(out)<-NULL
   out
 }
-
 
 fixHomerTFs<-function(tf0){
   tf<-toupper(tf0)
@@ -341,6 +343,38 @@ plot.great<-function(tsv,cutoff=0.01,title="") {
   enrich<-filter(enrich, BinomFDRQVal<=cutoff)
   plotEnrich(enrich$TermName, enrich$BinomFDRQVal, title)
 }
+
+plotEnrich2<-function(term, qval,title=""){
+  data<-data.frame(x=term,y=-log10(qval))
+  data<-data[order(data$y),]
+  ggplot(data, aes(x=x, y=y))+
+    geom_bar(stat="identity", fill='#f2bd42')+
+    coord_flip()+
+    scale_x_discrete(limits=data$x)+
+    theme_classic()+
+    theme(legend.position="none")+
+    scale_y_continuous(expand = c(0,0),position = 'right')+
+    labs(x="", y="-Log10(q-value)",title=title)+
+    theme(panel.grid.major.x = element_line(color = "#999999"))+
+    theme(axis.text = element_text(color = "black"))+
+    theme(axis.ticks.y = element_blank())+
+    theme(axis.ticks.x = element_blank())+
+    theme(axis.line.x = element_blank())
+}
+plot.great2<-function(tsv,cutoff=0.01,title="",num=10) {
+  enrich<-loadData2(tsv, comment.char = "#", header=FALSE)
+  enrich.col<-c("TermName","BinomRank","BinomRawPValue","BinomFDRQVal","BinomFoldEnrichment","BinomObservedRegionHits","BinomRegionSetCoverage","HyperRank","HyperFDRQVal","HyperFoldEnrichment","HyperObservedGeneHits","HyperTotalGenes","HyperGeneSetCoverage")
+  colnames(enrich)<-enrich.col
+  enrich<-enrich[,-ncol(enrich)]
+  enrich<-filter(enrich, BinomFDRQVal<=cutoff)
+  enrich<-enrich[nchar(enrich$TermName) <= 40,]
+  if (num>nrow(enrich)){
+    num<-nrow(enrich)
+  }
+  enrich<-enrich[1:num,]
+  plotEnrich2(enrich$TermName, enrich$BinomFDRQVal, title)
+}
+
 plotBarError<-function(valueStage, xlabel="",ylabel="TPM"){
   ggplot(data=valueStage,aes(x=stage,y=value,fill=stage))+
     scale_fill_manual(values=colorMapStage) +
@@ -374,7 +408,7 @@ plotDot<-function(x,y, col,xlab,ylab,text.title=NA, withTest=FALSE){
 getHeatmapAnnotatio<-function(sample){
   column_annotation <-HeatmapAnnotation(
     df=data.frame(Stage=sample$Group),
-    col = list(Stage =colorMapStage),
+    col = list(Stage =colorMapStage2),
     show_annotation_name =FALSE,
     annotation_name_side='left'
   )
@@ -401,7 +435,7 @@ colorMapGroup<-c("#1f77b4", "#ff7f0e", "#17becf", "#e377c2", "#2ca02c", "#9467bd
 names(colorMapGroup)<-c('HypoInAIS','HyperInAIS','HypoInMIA','HyperInMIA','HypoInIAC','HyperInIAC')
 colorMapStage<-c('#00FF00','#00BFFF','#FFB90F','#FF0000')
 names(colorMapStage)<-groupFactorLevel
-colorMapStage2<-c('green','cyan','orange','red')
+colorMapStage2<-c('#2878b5','#9ac9db','#f8ac8c','#c82423')
 names(colorMapStage2)<-groupFactorLevel
 
 
@@ -430,8 +464,8 @@ Group <- setRefClass(
       table<<-data
       list <<-split(table, table$Group)
       color.map<<-data.frame(
-        group=names(colorMapStage),
-        colors=colorMapStage
+        group=names(colorMapStage2),
+        colors=colorMapStage2
       )
     },
     select = function(groups,colors=NULL) {
@@ -463,7 +497,7 @@ Group <- setRefClass(
       data[,keep]
     },
     getColorMapVec=function(){
-      colorMapStage
+      colorMapStage2
     },
     show = function() {
       print(table(table$Group))
@@ -559,7 +593,7 @@ RnaTPM <- setRefClass(
       if(colAnno){
         column_annotation <-HeatmapAnnotation(
           df=data.frame(Stage=sample$Group),
-          col = list(Stage =colorMapStage),
+          col = list(Stage =colorMapStage2),
           show_annotation_name =FALSE,
           annotation_name_side='left'
         )
@@ -570,7 +604,8 @@ RnaTPM <- setRefClass(
               cluster_columns = FALSE,
               show_row_names=TRUE,
               show_column_names=colNames,
-              col=colorRamp2(c(-2, 0, 2), c("green3", "black", "red3")),
+              # col=colorRamp2(c(-2, 0, 2), c("green3", "black", "red3")),
+              col=colorRamp2(c(-2, 0, 2), c("#0808ff", "#ffffff", "#ff0808")),
               top_annotation = column_annotation
       )
     },

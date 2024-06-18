@@ -133,7 +133,7 @@ SRDEG<-list(
 )
 saveRDS(SRDEG, file.path(CONFIG$dataIntermediate,'rna', 'srdeg.rds'))
 saveRDS(degStage, file.path(CONFIG$dataIntermediate,'rna', 'deg.stage.rds'))
-plot.degStage<-function(gene) {
+plot.degStage<-function(gene, do_top_annotation=FALSE) {
   rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
   symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
   keep<-match(gene, symbol)[!is.na(match(gene, symbol))]
@@ -142,13 +142,21 @@ plot.degStage<-function(gene) {
   mm<-t(scale(t(m)))
   mm<-mm[!is.na(mm[,1]),]
   samples<-groups$RNA$selectBySample(colnames(mm))
-  column_annotation <-HeatmapAnnotation(
-    df=data.frame(Stage=samples$Group),
-    col = list(Stage =colorMapStage),
-    show_annotation_name =FALSE,
-    annotation_name_side='left'
-  )
+  if (do_top_annotation) {
+    column_annotation <-HeatmapAnnotation(
+      df=data.frame(Stage=samples$Group),
+      col = list(Stage =colorMapStage2),
+      show_annotation_name =FALSE,
+      annotation_name_side='left'
+    )
+  }else{
+    column_annotation<-NULL
+  }
+  mm<-2 * (mm - min(mm)) / (max(mm) - min(mm)) - 1
+  print(sprintf("max: %f, min: %f", max(mm), min(mm)))
   Heatmap(mm,
+          # col=colorRamp2(c(-1,-0.5,0,0.5 ,1), c("#333cac","#1d9cbb","#c5ba59", "#f5cc2f","#f6f803")),
+          col=colorRamp2(c(-1, -0.6, 1), c("#0808ff", "#ffffff", "#ff0808")),
           top_annotation = column_annotation,
           cluster_rows=TRUE,
           cluster_columns = FALSE,
@@ -157,21 +165,25 @@ plot.degStage<-function(gene) {
           heatmap_legend_param = list(
             title = "Scaled TPM",
             legend_height = unit(4, "cm"),
-            at = c(0,0.5,1),
             title_position = "lefttop-rot"
           ),
   )
 }
-saveImage2("rna.deg.SR.AIS.heatmap.pdf",width = 4.5,height = 3)
-plot.degStage(degStage$AIS)
+saveImage2("rna.deg.SR.AIS.heatmap.pdf",width = 3,height = 3)
+up<-plot.degStage(filter(SRDEG$detail$AIS,logFC>0)$genes, do_top_annotation=TRUE)
+down<-plot.degStage(filter(SRDEG$detail$AIS,logFC<0)$genes)
+up%v%down
 dev.off()
-saveImage2("rna.deg.SR.MIA.heatmap.pdf",width = 4.5,height = 3)
-plot.degStage(degStage$MIA)
+saveImage2("rna.deg.SR.MIA.heatmap.pdf",width = 3,height = 3)
+up<-plot.degStage(filter(SRDEG$detail$MIA,logFC>0)$genes, do_top_annotation=TRUE)
+down<-plot.degStage(filter(SRDEG$detail$MIA,logFC<0)$genes)
+up%v%down
 dev.off()
-saveImage2("rna.deg.SR.IAC.heatmap.pdf",width = 4.5,height = 3)
-plot.degStage(degStage$IAC)
+saveImage2("rna.deg.SR.IAC.heatmap.pdf",width = 3,height = 3)
+up<-plot.degStage(filter(SRDEG$detail$IAC,logFC>0)$genes, do_top_annotation=TRUE)
+down<-plot.degStage(filter(SRDEG$detail$IAC,logFC<0)$genes)
+up%v%down
 dev.off()
-
 
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S3B Expression of significant differential expression epiTFs
@@ -227,67 +239,106 @@ outputGo(goMIA$kegg, 'deg.MIA.kegg.csv')
 outputGo(goIAC$kegg, 'deg.IAC.kegg.csv')
 
 plot.clusterprofiler<-function(go,title=""){
-  enrich<-head(go,n=15)
-  plotEnrich(enrich$Description, enrich$qvalue,title=title)
+  enrich<-head(go,n=8)
+  plotEnrich2(enrich$Description, enrich$qvalue,title=title)
 
 }
-plot.clusterprofiler(goAIS$cc)
-saveImage2("rna.deg.SR.go.AIS.BP.pdf",width = 4,height = 5)
+# plot.clusterprofiler(goAIS$cc)
+saveImage2("rna.deg.SR.go.AIS.BP.pdf",width = 4,height = 4)
 plot.clusterprofiler(goAIS$bp)
 dev.off()
-plot.clusterprofiler(goAIS$mf)
+# plot.clusterprofiler(goAIS$mf)
 
-plot.clusterprofiler(goMIA$cc)
+# plot.clusterprofiler(goMIA$cc)
 saveImage2("rna.deg.SR.go.MIA.BP.pdf",width = 4,height = 4)
 plot.clusterprofiler(goMIA$bp)
 dev.off()
-plot.clusterprofiler(goMIA$mf)
+# plot.clusterprofiler(goMIA$mf)
 
-plot.clusterprofiler(goIAC$cc)
-saveImage2("rna.deg.SR.go.IAC.BP.pdf",width = 4,height = 5)
+# plot.clusterprofiler(goIAC$cc)
+saveImage2("rna.deg.SR.go.IAC.BP.pdf",width = 4.5,height = 4)
 plot.clusterprofiler(goIAC$bp)
 dev.off()
-plot.clusterprofiler(goIAC$mf)
+# plot.clusterprofiler(goIAC$mf)
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 4G TF-DEG pair correlation
 #----------------------------------------------------------------------------------------------------------------------
 deg<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'deg.rds'))
+srdeg<-loadSRDEG()
 rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
 symbol<-ensemble2Symbol3(rnaTPM$ensemble, keepIfNotMatch = TRUE)
 epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))
-genes<-unique(c(unlist(sapply(deg,function(x){x$genes})),epiTFs$tf))
-keep<-match(genes, symbol)[!is.na(match(genes, symbol))]
-m<-as.matrix(rnaTPM[keep,-1])
-rownames(m)<-symbol[keep]
-mm<-m
-mm<-mm[!is.na(mm[,1]),]
-cor(t(mm))->a
-a[lower.tri(a)]<-1
-df0<-melt(a)
-df0<-filter(df0, value<1)
+#epiTFsDEG<-lapply(deg,function(x){intersect(x$genes, epiTFs$tf)})%>%unlist()%>%unique()
+epiTFsDEG<-do.call(rbind,lapply(srdeg$detail,function(x){
+  a<-filter(x,genes%in%epiTFs$tf)
+  data.frame(genes=a$genes, deg=ifelse(startsWith(a$class, 'Up'), 'up', 'down'))
+}))
 
 
-tfDEG<-df0[(df0$Var1%in%epiTFs$tf|df0$Var2%in%epiTFs$tf),]
-tfDEG$Var1<-as.vector(tfDEG$Var1)
-tfDEG$Var2<-as.vector(tfDEG$Var2)
-tfDEG$tf<-ifelse(tfDEG$Var1%in%epiTFs$tf, tfDEG$Var1, tfDEG$Var2)
-tfDEG$gene<-ifelse(tfDEG$Var1%in%epiTFs$tf, tfDEG$Var2, tfDEG$Var1)
-tfDEG<-dplyr::select(tfDEG, tf, gene, value)
-saveRDS(tfDEG,file.path(CONFIG$dataIntermediate, 'tf','tf.epiTFs.deg.cor.rds'))
-df<-filter(tfDEG,abs(value)>=0.7)
-tfCorNumber<-sapply(split(df, df$tf),function(x){
-  nrow(x)
+
+genesTF<-unique(epiTFs$tf)
+genesDEG<-unique(unlist(sapply(deg,function(x){x$genes})))
+
+
+rnaTPM<-RnaTPM()
+mTF<-rnaTPM$getTPM(genesTF,rmIfcontainNA=TRUE)
+mDEG<-rnaTPM$getTPM(genesDEG,rmIfcontainNA=TRUE)
+
+mCorP<-sapply(data.frame(t(mTF),check.names = FALSE), function(x){
+  sapply(data.frame(t(mDEG)), function(y){
+    t<-cor.test(x,y)
+    t$p.value
+  })
 })
-tfCorNumber<-sort(tfCorNumber, decreasing = TRUE)
-saveImage2("rna.deg.epiTFs.coexp.pdf",width = 10,height = 3)
-barplot(tfCorNumber,ylab="Co-Expression Gene",las=2,cex.names =0.8, col='red')
+
+mCorCor<-sapply(data.frame(t(mTF), check.names = FALSE), function(x){
+  sapply(data.frame(t(mDEG)), function(y){
+    t<-cor.test(x,y)
+    t$estimate
+  })
+})
+
+dfCorP<-melt(mCorP)
+dfCorCor<-melt(mCorCor)
+
+dfCor<-data.frame(TF=dfCorP$Var2, DEG=dfCorP$Var1, cor=dfCorCor$value, p=dfCorP$value)
+dfCorTotal<-filter(dfCor,p<=0.05)
+tfCorNumber<-sapply(split(dfCorTotal, dfCorTotal$TF),function(x){nrow(x)})
+dfCorPositive<-filter(dfCor,p<0.05, cor>0)
+dfCorNegative<-filter(dfCor,p<0.05, cor<0)
+tfCorNumberPositive<-sapply(split(dfCorPositive, dfCorPositive$TF),function(x){nrow(x)})
+tfCorNumberNegative<-sapply(split(dfCorNegative, dfCorNegative$TF),function(x){nrow(x)})
+
+
+df<-sapply(split(dfCorTotal, dfCorTotal$TF),function(x){
+  t<-nrow(x)
+  p<-sum(x$cor>0)
+  n<-sum(x$cor<0)
+  c(t,p,n)
+})%>%t
+dfPlot<-data.frame(tf=rownames(df), total=df[,1], positive=df[,2], negative=df[,3])
+dfPlot<-arrange(dfPlot, desc(total))
+
+
+tfCorNumberNegative<-dfPlot$negative
+tfCorNumberPositive<-dfPlot$positive
+names(tfCorNumberNegative)<-rownames(dfPlot)
+names(tfCorNumberPositive)<-rownames(dfPlot)
+yMax<-max(c(tfCorNumberNegative, tfCorNumberPositive))
+
+cm<-c('#c82423','gray','#2878b5')
+names(cm)<-c('up','nc','down')
+tfDegDir<-epiTFsDEG[match(names(tfCorNumber),epiTFsDEG$genes),]
+tfDegDir$deg[is.na(tfDegDir$deg)]<-'nc'
+tfColors<-cm[match(tfDegDir$deg, names(cm))]
+saveImage2("rna.deg.epiTFs.coexp.anno.pdf",width = 10,height = 2.5)
 dev.off()
 
-df<-filter(tfDEG,abs(value)>=0.85)
-tfCorNumber<-sapply(split(df, df$tf),function(x){
-  nrow(x)
-})
-tfCorNumber<-sort(tfCorNumber, decreasing = TRUE)
-tfCorNumber
 
-saveCsv(df,file.path(CONFIG$dataIntermediate, 'rna','rna.deg.epiTFs.coexp.csv'))
+
+saveImage2("rna.deg.epiTFs.coexp.pdf",width = 10,height = 6)
+par(mfrow = c(3, 1))
+barplot(tfCorNumberNegative,ylab="Co-Expression Gene",las=2,cex.names =0.8, col='#9ac9db',ylim = c(0, yMax))
+barplot(tfCorNumberPositive,ylab="Co-Expression Gene",las=2,cex.names =0.8, col='#f8ac8c',ylim = c(0, yMax))
+barplot(rep(1,length(tfColors)),ylab="Co-Expression Gene",las=2,cex.names =0.8, col=tfColors)
+dev.off()

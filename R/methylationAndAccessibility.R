@@ -156,7 +156,7 @@ v[sample(length(m2.keep), 2000)]<-TRUE
 m2.keep.2<-m2.keep&v
 
 darAll.2<-darAll[m2.keep.2,]
-color.map<-c('red','white','green')
+color.map<-c('#d76364','#ffffff','#5f97d2')
 names(color.map)<-c('Hyper','NC','Hypo')
 row_annotation <-rowAnnotation(
   show_annotation_name = TRUE,
@@ -175,6 +175,7 @@ column_annotation <-HeatmapAnnotation(
 m2.2<-m2[m2.keep.2,]
 m1.2<-m1[m2.keep.2,]
 h1<-Heatmap(m1.2,
+            col=colorRamp2(c(min(m1.2),quantile(unlist(m1.2), 0.25),quantile(unlist(m1.2), 0.5),quantile(unlist(m1.2), 0.75) ,max(m1.2)), c("#333cac","#1d9cbb","#c5ba59", "#f5cc2f","#f6f803")),
             cluster_rows=TRUE,
             cluster_columns = FALSE,
             show_row_names=FALSE,
@@ -185,6 +186,7 @@ h1<-Heatmap(m1.2,
             top_annotation = column_annotation
 )
 h2<-Heatmap(m2.2,
+            col=colorRamp2(c(0, 0.5,1), c("#4574b6", "#fdfec2", "#d83127")),
             cluster_rows=TRUE,
             cluster_columns = FALSE,
             show_row_names=FALSE,
@@ -205,8 +207,8 @@ rnaTPM<-readRDS(file.path(CONFIG$dataIntermediate,'rna', 'rnaTPM.rds'))
 rnaTPMSymbol<-mapEnsemble2Symbol(rnaTPM$ensemble)
 darDeseq2<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'darDeseq2.rds'))
 data.atacPeakTPM<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), atacPeakTPM)
-data.atacPeakMethyLevel<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), atacPeakMethyLevel)
-data.rnaTPM<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage), rnaTPM)
+data.atacPeakMethyLevel<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage2), atacPeakMethyLevel)
+data.rnaTPM<-groups$WGBS.RNA.ATAC$pickColumnsByGroup(names(colorMapStage2), rnaTPM)
 epiTFs<-readRDS(file.path(CONFIG$dataIntermediate,'tf', 'epiTFs.rds'))
 epiTFsDAR<-readRDS(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','tf.epiTFs.DAR.rds'))
 

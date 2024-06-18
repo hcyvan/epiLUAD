@@ -161,15 +161,19 @@ saveTsv(filter(SRDAR,class=='HypoInIAC')[,1:3], file.path(CONFIG$dataIntermediat
 SRDAR<-loadSRDAR()
 atacPeakTPM<-readRDS(file.path(CONFIG$dataIntermediate,'atac', 'atacPeakTPM.rds'))
 dar<-split(SRDAR,SRDAR$class)
-plot.srdar<-function(region){
+plot.srdar<-function(region, do_top_annotation=FALSE){
   data<-atacPeakTPM[match(bed2Feature(region),bed2Feature(atacPeakTPM)),-(1:3)]
   samples<-groups$ATAC$selectBySample(colnames(data))
-  column_annotation <-HeatmapAnnotation(
-    df=data.frame(Stage=samples$Group),
-    col = list(Stage =colorMapStage),
-    show_annotation_name =FALSE,
-    annotation_name_side='left'
-  )
+  if (do_top_annotation) {
+    column_annotation <-HeatmapAnnotation(
+      df=data.frame(Stage=samples$Group),
+      col = list(Stage =colorMapStage2),
+      show_annotation_name =FALSE,
+      annotation_name_side='left'
+    )
+  }else{
+    column_annotation<-NULL
+  }
   m1<-data
   nrow1<-nrow(m1)
   if (nrow(m1) >=1000){
@@ -178,7 +182,11 @@ plot.srdar<-function(region){
   }
   nrow2<-nrow(m1)
   print(sprintf("%d => %d", nrow1, nrow2))
-  Heatmap(t(scale(t(m1))),
+  mm<-t(scale(t(m1)))
+  mm<-2 * (mm - min(mm)) / (max(mm) - min(mm)) - 1
+  print(sprintf("max: %f, min: %f", max(mm), min(mm)))
+  Heatmap(mm,
+          col=colorRamp2(c(-1,-0.5,0,0.5 ,1), c("#333cac","#1d9cbb","#c5ba59", "#f5cc2f","#f6f803")),
           top_annotation = column_annotation,
           cluster_rows=TRUE,
           cluster_columns = FALSE,
@@ -187,31 +195,27 @@ plot.srdar<-function(region){
           heatmap_legend_param = list(
             title = "Scaled Accessibility",
             legend_height = unit(4, "cm"),
-            at = c(0,0.5,1),
-            labels = c('0','0.5','1'),
             title_position = "lefttop-rot"
           ),
   )
 }
-saveImage2("atac.srdar.heatmap.HyperInAIS.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HyperInAIS)
-dev.off()
-saveImage2("atac.srdar.heatmap.HypoInAIS.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HypoInAIS)
-dev.off()
-saveImage2("atac.srdar.heatmap.HyperInMIA.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HyperInMIA)
-dev.off()
-saveImage2("atac.srdar.heatmap.HypoInMIA.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HypoInMIA)
-dev.off()
-saveImage2("atac.srdar.heatmap.HyperInIAC.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HyperInIAC)
-dev.off()
-saveImage2("atac.srdar.heatmap.HypoInIAC.pdf",width = 3.5,height = 2)
-plot.srdar(dar$HypoInIAC)
+saveImage2("atac.srdar.heatmap.AIS.pdf",width = 3.5,height = 4)
+hyper<-plot.srdar(dar$HyperInAIS,TRUE)
+hypo<-plot.srdar(dar$HypoInAIS)
+hyper%v%hypo
 dev.off()
 
+saveImage2("atac.srdar.heatmap.MIA.pdf",width = 3.5,height = 4)
+hyper<-plot.srdar(dar$HyperInMIA,TRUE)
+hypo<-plot.srdar(dar$HypoInMIA)
+hyper%v%hypo
+dev.off()
+
+saveImage2("atac.srdar.heatmap.IAC.pdf",width = 3.5,height = 4)
+hyper<-plot.srdar(dar$HyperInIAC,TRUE)
+hypo<-plot.srdar(dar$HypoInIAC)
+hyper%v%hypo
+dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 3F. SRDAR Density near TSS and CGI
 #----------------------------------------------------------------------------------------------------------------------
@@ -318,11 +322,11 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 3G,H. GREAT analysis of SRDARs
 #----------------------------------------------------------------------------------------------------------------------
-saveImage2("dar.great.AIS.hypo.BP.pdf",width = 4,height = 3)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HypoInAIS.GOBiologicalProcess.tsv"),title="")
+saveImage2("dar.great.AIS.hypo.BP.pdf",width = 3.5,height = 2)
+plot.great2(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HypoInAIS.GOBiologicalProcess.tsv"),title="")
 dev.off()
-saveImage2("dar.great.IAC.hyper.HPO.pdf",width = 4,height = 6)
-plot.great(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HyperInIAC.GOBiologicalProcess.tsv"),title="")
+saveImage2("dar.great.IAC.hyper.BP.pdf",width = 4,height = 3)
+plot.great2(file.path(CONFIG$dataIntermediate, 'atac',"srdar.HyperInIAC.GOBiologicalProcess.tsv"),title="")
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S2A. ATAC-seq: DAR Homer Figure. heatmap
@@ -359,15 +363,21 @@ saveImage2("dar.status.scatter.logfc.length.pdf",width = 6,height = 9)
 grid.arrange(p1, p2,p3,p4, p5,p6,nrow = 3)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
-# Table S11. ATAC-seq: DAR Homer
+# ATAC-seq: DAR Homer
 #----------------------------------------------------------------------------------------------------------------------
-HypoInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hypo'),'HypoInAIS')
-HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','MIA.hyper'),'HyperInMIA')
-HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hyper'),'HyperInIAC')
-HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hypo'),'HypoInIAC')
+HypoInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','AIS.hypo'),'HypoInAIS', logP = TRUE)
+HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','MIA.hyper'),'HyperInMIA', logP = TRUE)
+HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hyper'),'HyperInIAC', logP = TRUE)
+HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'atac','homer.mask','IAC.hypo'),'HypoInIAC', logP = TRUE)
 tfs<-do.call(rbind,list(HypoInAIS,HyperInMIA,HyperInIAC, HypoInIAC))
 srdarTFs<-getSRTFS(tfs)
 saveRDS(srdarTFs,file.path(CONFIG$dataIntermediate,'atac', 'srdar.tfs.rds'))
+
+head(distinct(HyperInAIS, tf,.keep_all = TRUE),n=10)
+head(distinct(HyperInMIA, tf,.keep_all = TRUE),n=10)
+head(distinct(HyperInIAC, tf,.keep_all = TRUE),n=25)
+head(distinct(HypoInIAC, tf,.keep_all = TRUE),n=20)
+
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S2B. SRDAR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------

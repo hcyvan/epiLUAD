@@ -86,7 +86,7 @@ getOverlapMatrixLogP<-function(epiTFsDARTarget){
   mm <- -log10(m)
   mm
 }
-getOverlapMatrixLogFC<-function(epiTFsDARTarget,calMean=FALSE){
+getOverlapMatrixLogFC<-function(epiTFsDARTarget,calMean=FALSE, calLog=TRUE){
   epiTFsAllRegionList<-split(epiTFsAllRegion,epiTFsAllRegion$tf)
   epiTFsDARList<-split(epiTFsDARTarget,epiTFsDARTarget$tf)
   tfs<-names(epiTFsAllRegionList)
@@ -105,10 +105,18 @@ getOverlapMatrixLogFC<-function(epiTFsDARTarget,calMean=FALSE){
   })->m
   print(min(m))
   print(min(log2(m)))
-  if (calMean){
-    rowMeans(log2(m))
+  if (calLog){
+    if (calMean){
+      rowMeans(log2(m))
+    }else{
+      log2(m)
+    }
   }else{
-    log2(m)
+    if (calMean){
+      rowMeans(m)
+    }else{
+      m
+    }
   }
 }
 
@@ -173,6 +181,7 @@ plotTFClusterHeatmapRatio<-function(mm){
 }
 
 doCluster<-function(mm,k=6){
+  myDist <- function(x) dist(x, method = "euclidean")
   Heatmap(mm,
           name='Ratio',
           column_names_gp = grid::gpar(fontsize = 6),
@@ -182,12 +191,18 @@ doCluster<-function(mm,k=6){
           clustering_distance_rows = myDist,
           clustering_distance_columns = myDist
   )%>%draw()%>%row_dend()->tree
-  colors<-c('1'="#E41A1CA0",
-            '2'="#377EB8A0",
-            '3'="#4DAF4AA0",
-            '4'="#984EA3A0",
-            '5'="#FF7F00A0",
-            '6'="#FFFF33A0")
+  # colors<-c('1'="#E41A1CA0",
+  #           '2'="#377EB8A0",
+  #           '3'="#4DAF4AA0",
+  #           '4'="#984EA3A0",
+  #           '5'="#FF7F00A0",
+  #           '6'="#FFFF33A0")
+  colors<-c('1'="#E41A1C",
+            '2'="#377EB8",
+            '3'="#4DAF4A",
+            '4'="#984EA3",
+            '5'="#FF7F00",
+            '6'="#FFDF33")
   list(
     tree=tree,
     clusters= cutree(as.hclust(tree), k=k),
@@ -196,11 +211,13 @@ doCluster<-function(mm,k=6){
 }
 
 plotTFClusterHeatmapRatio2<-function(mm,fc,cluster){
+  myDist <- function(x) dist(x, method = "euclidean")
   row_ha = rowAnnotation(cluster = cluster$clusters, 
-                         log2FC = anno_barplot(fc,gp=gpar(border =NA,fill="gray6",lty="blank")),
+                         logFC = anno_points(fc,gp=gpar(col='#1b9698'),pch=20,width = unit(3, "cm")),
                          col=list(cluster=cluster$colors))
   a<-Heatmap(mm,
              name='Ratio',
+             col=colorRamp2(c(0,0.2 ,0.6), c("#4d7295","#f0e7e0","#9a2c3c")),
              column_names_gp = grid::gpar(fontsize = 6),
              row_names_gp = grid::gpar(fontsize = 6),
              right_annotation = row_ha,
@@ -209,27 +226,29 @@ plotTFClusterHeatmapRatio2<-function(mm,fc,cluster){
              clustering_distance_rows = myDist,
              clustering_distance_columns = myDist
   )%>%draw()
-  decorate_row_dend("Ratio", {
-    ind = cluster$clusters[order.dendrogram(cluster$tree)]
-    ind<-rev(ind)
-    x1<-c(0)
-    x2<-c(0)
-    print(ind)
-    for (i in unique(ind)){
-      x1<-c(x1,x2[length(x2)])
-      x2<-c(x2,x2[length(x2)]+sum(ind==i))
-    }
-    x1<-x1[-1]
-    x2<-x2[-1]
-    grid.rect(y = x1/length(ind), height = (x2 - x1)/length(ind),just = "bottom",
-              default.units = "npc", gp = gpar(fill = cluster$colors[unique(ind)],col=NA))
-  })
+  # decorate_row_dend("Ratio", {
+  #   ind = cluster$clusters[order.dendrogram(cluster$tree)]
+  #   ind<-rev(ind)
+  #   x1<-c(0)
+  #   x2<-c(0)
+  #   print(ind)
+  #   for (i in unique(ind)){
+  #     x1<-c(x1,x2[length(x2)])
+  #     x2<-c(x2,x2[length(x2)]+sum(ind==i))
+  #   }
+  #   x1<-x1[-1]
+  #   x2<-x2[-1]
+  #   grid.rect(y = x1/length(ind), height = (x2 - x1)/length(ind),just = "bottom",
+  #             default.units = "npc", gp = gpar(fill = cluster$colors[unique(ind)],col=NA))
+  # })
 }
+
   
 
 mmLogP<-getOverlapMatrixLogP(epiTFsDAR)
 mmLogFC<-getOverlapMatrixLogFC(epiTFsDAR)
 mmLogFCMean<-getOverlapMatrixLogFC(epiTFsDAR, calMean = TRUE)
+mmFCMean<-getOverlapMatrixLogFC(epiTFsDAR, calMean = TRUE,calLog = FALSE)
 mmRatio<-getOverlapMatrixRatio(epiTFsDAR)
 
 cluster<-doCluster(mmRatio,k=6)
@@ -240,8 +259,9 @@ dev.off()
 # saveImage2("tf.epiTFs.srdar.cluster.heatmap.log2fc.pdf",width = 7,height = 6)
 # plotTFClusterHeatmapLogFC(mmLogFC)#Figure S3B
 # dev.off()
-saveImage2("tf.epiTFs.srdar.cluster.heatmap.ratio.pdf",width = 7,height = 6)
-plotTFClusterHeatmapRatio2(mmRatio, mmLogFCMean, cluster)#Figure 3J
+saveImage2("tf.epiTFs.srdar.cluster.heatmap.ratio.pdf",width = 7,height = 5)
+# plotTFClusterHeatmapRatio2(mmRatio, mmLogFCMean, cluster)#Figure 3J
+plotTFClusterHeatmapRatio2(mmRatio, mmFCMean, cluster)#Figure 3J
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S3A. EpiTFs cluster

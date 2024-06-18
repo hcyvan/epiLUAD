@@ -11,19 +11,6 @@ library(ggpubr)
 library(Hmisc)
 library(readxl)
 
-
-drawDensity<-function(ratio1,ratio2,s1,s2,legend.position='topleft'){
-  d1 <- density(ratio1)
-  d2 <- density(ratio2)
-  dens <- list(a=d1,b=d2)
-  plot(NA, xlim=range(sapply(dens, "[", "x")),
-       ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=2, cex.axis=1.5)
-  mapply(lines, dens, col=1:length(dens))
-  polygon(d1, col=rgb(0, 1, 0,0.5), border=NA)
-  polygon(d2, col=rgb(1, 0, 0,0.5), border=NA)
-  legend(legend.position, legend=c(s1,s2), fill=c("green","red"), bty = "n")
-}
-
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 1B: The Average DNA methylation level of samples in each group
 #----------------------------------------------------------------------------------------------------------------------
@@ -35,36 +22,62 @@ data<-data.frame(
   group=samples$Group,
   ratio=samplesMatch$MCALL_MeanRatioCG_3X
 )
-saveImage2("methylation.level.mean.pdf",width = 5,height = 3)
+saveImage2("methylation.level.mean.pdf",width = 3.5,height = 2.5)
 ggplot(data=data,aes(x=group,y=ratio,fill=group))+
-  scale_fill_manual(values=colorMapStage) +
+  scale_fill_manual(values=colorMapStage2) +
   # geom_violin(trim=FALSE) +
-  geom_violin(draw_quantiles = NULL, colour = NA,trim=FALSE)+
-  geom_jitter(shape=17, position=position_jitter(0.2), colour='black', size=0.5)+
-  stat_summary(fun.data=mean_sdl, geom="pointrange", color="black")+
+  geom_violin( colour = 'NA',trim=TRUE)+
+  stat_summary(fun.data=mean_sdl, geom="pointrange", color="#ffffff",size=0.2)+
   theme_classic()+
   stat_compare_means( comparisons = list(c('CTL','AIS'),c('CTL','MIA'),c('CTL','IAC')),
                       label = 'p.signif', method = "t.test")+
   labs(x='',y='Mean Methylation Level')+
-  theme(legend.position="right",
+  theme(legend.position="none",
+        # axis.line = element_line(linewidth = 1),none
         axis.title.x = element_text(size=0),
-        axis.title.y = element_text(size=15),
-        axis.text = element_text(size = 12,colour="black"),
-        legend.title = element_blank(),
-        legend.text = element_text(size=12))+
+        axis.title.y = element_text(size=14),
+        axis.text = element_text(size = 14,colour="black"))+
   guides(colour = guide_legend(override.aes = list(shape = 12,size=10)))
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 1C: The methylation level density distribution of CTL vs. AIS, CTL vs. MIA and CTL vs. IAC
 #----------------------------------------------------------------------------------------------------------------------
+drawDensity<-function(ratio1,ratio2,s1,s2){
+  d1 <- density(ratio1)
+  d2 <- density(ratio2)
+  dens <- list(a=d1,b=d2)
+  plot(NA, xlim=range(sapply(dens, "[", "x")),
+       ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=1.5, cex.axis=1.5)
+  mapply(lines, dens, col=1:length(dens))
+  polygon(d1, col=NA, border=s1)
+  polygon(d2, col=NA, border=s2)
+}
+
 ratio <- loadData2(file.path(CONFIG$dataExternal, 'LAD.group.ratio.bed'))
 ratio<-removeNegativeOne(ratio)
-saveImage2("methylation.level.density.pdf",width = 4,height = 3.5)
+
+d1 <- density(ratio$CTL)
+d2 <- density(ratio$AIS)
+d3 <- density(ratio$MIA)
+d4 <- density(ratio$IAC)
+dens <- list(a=d1,b=d2,c=d3,d=d4)
+saveImage2("methylation.level.density.one.pdf",width = 4,height = 4)
+plot(NA, xlim=range(sapply(dens, "[", "x")),
+     ylim=range(sapply(dens, "[", "y")),xlab="",ylab="Density",cex.lab=2, cex.axis=1.5)
+mapply(lines, dens, col=1:length(dens))
+polygon(d1, border=colorMapStage2[1], col=NA)
+polygon(d2, border=colorMapStage2[2], col=NA)
+polygon(d3, border=colorMapStage2[3], col=NA)
+polygon(d4, border=colorMapStage2[4], col=NA)
+legend('topleft', legend=names(colorMapStage2), fill=colorMapStage2, bty = "n")
+dev.off()
+
+saveImage2("methylation.level.density.pdf",width = 4,height = 4)
 layout(1:3)
 par(mar = c(3,5,1,1))
-drawDensity(ratio$CTL, ratio$AIS, "CTL", "AIS")
-drawDensity(ratio$CTL, ratio$MIA, "CTL", "MIA")
-drawDensity(ratio$CTL, ratio$IAC, "CTL", "IAC")
+drawDensity(ratio$CTL, ratio$AIS, colorMapStage2[1], colorMapStage2[2])
+drawDensity(ratio$CTL, ratio$MIA, colorMapStage2[1], colorMapStage2[3])
+drawDensity(ratio$CTL, ratio$IAC, colorMapStage2[1], colorMapStage2[4])
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 1D: The Average DNA methylation level of some Genomic Regions
@@ -77,20 +90,19 @@ m<-do.call(rbind,lapply(genomicRegionMethyLevel, function(x){
 rownames(m)<-c('CpG Islands', 'CpG Sea','CpG Shelves', 'CpG Shores', 'Exons', 'Intergenic', 'Intron', 'Promoter 1K', 'Promoter 5k', 'TSS', "3'UTR", "5'UTR")
 samples<-groups$WGBS$selectBySample(colnames(m))
 
-color.map<-groups$WGBS$getColorMapVec()
 column_annotation <-HeatmapAnnotation(
   df=data.frame(Stage=samples$Group),
-  col = list(Stage =color.map),
+  col = list(Stage =colorMapStage2),
   show_annotation_name =FALSE,
   annotation_name_side='left'
 )
-saveImage2("genomicRegion.heatmap.pdf",width = 12,height = 2.5)
+saveImage2("genomicRegion.heatmap.pdf",width = 8,height = 2.5)
 Heatmap(m,
         cluster_rows=TRUE,
         cluster_columns = FALSE,
         show_column_names=FALSE,
         bottom_annotation = column_annotation,
-        # column_names_gp = gpar(col = samples$colors)
+        col=colorRamp2(c(0, 0.5,1), c("#4574b6", "#fdfec2", "#d83127")),
         heatmap_legend_param = list(
           title = "DNA Methylation Levels",
           legend_height = unit(4, "cm"),
@@ -331,22 +343,27 @@ saveTsv(SRDMC, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.bed'),col.names=
 saveCsv(srdmc.count, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.count.detail.csv'))
 saveCsv(SRDMC.count, file.path(CONFIG$dataIntermediate, 'wgbs','srdmc.count.csv'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2B-D. SRDMC Mehtylation Levels Heatmap
+# Figure 2B. SRDMC Mehtylation Levels Heatmap
 #----------------------------------------------------------------------------------------------------------------------
 srdmcMethyLevel<-readRDS(file.path(CONFIG$dataIntermediate, 'wgbs','dmc.methyLevel.rds'))
 # dataj<-readRDS(file.path(CONFIG$dataIntermediate, 'dmc.methyLevel.rds'))
 srdmcMethyLevel<-split(srdmcMethyLevel,srdmcMethyLevel$class)
-plot.srdmc<-function(data){
+plot.srdmc<-function(data, do_top_annotation=FALSE){
+  # data<-data[!data$chrom%in%c('chrX','chrY'),]
   m<-as.matrix(data[,5:ncol(data)])
   m1<-m[rowSums(is.na(m))==0,]
   samples<-groups$WGBS$selectBySample(colnames(m))
-  color.map<-groups$WGBS$getColorMapVec()
-  column_annotation <-HeatmapAnnotation(
-    df=data.frame(Stage=samples$Group),
-    col = list(Stage =color.map),
-    show_annotation_name =FALSE,
-    annotation_name_side='left'
-  )
+  if (do_top_annotation) {
+    column_annotation <-HeatmapAnnotation(
+      df=data.frame(Stage=samples$Group),
+      col = list(Stage =colorMapStage2),
+      show_annotation_name =FALSE,
+      annotation_name_side='left'
+    )
+  }else{
+    column_annotation<-NULL
+  }
+
   nrow1<-nrow(m1)
   if (nrow(m1) >=1000){
     set.seed(123)
@@ -355,6 +372,7 @@ plot.srdmc<-function(data){
   nrow2<-nrow(m1)
   print(sprintf("%d => %d", nrow1, nrow2))
   Heatmap(m1,
+          col=colorRamp2(c(0, 0.5,1), c("#4574b6", "#fdfec2", "#d83127")),
           top_annotation = column_annotation,
           cluster_rows=TRUE,
           cluster_columns = FALSE,
@@ -369,24 +387,22 @@ plot.srdmc<-function(data){
           ),
   )
 }
+saveImage2("srdmr.heatmap.AIS.pdf",width = 5,height = 4)
+hyper<-plot.srdmc(srdmcMethyLevel$HyperInAIS,TRUE)
+hypo<-plot.srdmc(srdmcMethyLevel$HypoInAIS)
+hyper%v%hypo
+dev.off()
 
-saveImage2("srdmr.heatmap.HyperInAIS.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HyperInAIS)
+saveImage2("srdmr.heatmap.MIA.pdf",width = 5,height = 4)
+hyper<-plot.srdmc(srdmcMethyLevel$HyperInMIA,TRUE)
+hypo<-plot.srdmc(srdmcMethyLevel$HypoInMIA)
+hyper%v%hypo
 dev.off()
-saveImage2("srdmr.heatmap.HyperInMIA.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HyperInMIA)
-dev.off()
-saveImage2("srdmr.heatmap.HyperInIAC.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HyperInIAC)
-dev.off()
-saveImage2("srdmr.heatmap.HypoInAIS.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HypoInAIS)
-dev.off()
-saveImage2("srdmr.heatmap.HypoInMIA.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HypoInMIA)
-dev.off()
-saveImage2("srdmr.heatmap.HypoInIAC.pdf",width = 3.5,height = 2)
-plot.srdmc(srdmcMethyLevel$HypoInIAC)
+
+saveImage2("srdmr.heatmap.IAC.pdf",width = 5,height = 4)
+hyper<-plot.srdmc(srdmcMethyLevel$HyperInIAC,TRUE)
+hypo<-plot.srdmc(srdmcMethyLevel$HypoInIAC)
+hyper%v%hypo
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # SR-DMR
@@ -442,7 +458,7 @@ out<-data.frame(
 )
 saveCsv(out, file.path(CONFIG$dataIntermediate, 'wgbs','srdmr.count.genomicRegion.csv'))
 #----------------------------------------------------------------------------------------------------------------------
-# Figure 2F. SRDMRs Density near TSS and CGI
+# Figure 2C. SRDMRs Density near TSS and CGI
 #----------------------------------------------------------------------------------------------------------------------
 genomicRegion<-readRDS(file.path(CONFIG$dataIntermediate, 'genomicRegion.rds'))
 cgIslands.gr<-genomicRegion$cgIslands
@@ -515,11 +531,11 @@ dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure 2F,G. GREAT analysis of SRDMRs
 #----------------------------------------------------------------------------------------------------------------------
-saveImage2("srdmr.great.HyperInAIS.BP.pdf",width = 4,height = 3.5)
-plot.great(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HyperInAIS.GOBiologicalProcess.tsv"),title="")
+saveImage2("srdmr.great.HyperInAIS.BP.pdf",width = 4,height = 2)
+plot.great2(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HyperInAIS.GOBiologicalProcess.tsv"),title="",num=8)
 dev.off()
-saveImage2("srdmr.great.HypoInIAC.BP.pdf",width = 4,height = 3.5)
-plot.great(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HypoInIAC.GOBiologicalProcess.tsv"),title="")
+saveImage2("srdmr.great.HypoInIAC.BP.pdf",width = 4,height = 2)
+plot.great2(file.path(CONFIG$dataIntermediate,'wgbs', "srdmr.HypoInIAC.GOBiologicalProcess.tsv"),title="",num=8)
 dev.off()
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S1A. SRDMRs Length and CpG Number
@@ -556,16 +572,21 @@ srdmr.status<-sapply(SRDMR.list, function(x){
 srdmr.status<-data.frame(srdmr.status)
 write.csv(srdmr.status, file.path(CONFIG$dataResult, 'srdmr.status.cpg.length.csv'),row.names  = TRUE,quote = FALSE)
 #----------------------------------------------------------------------------------------------------------------------
-# Table S9. SRDMRs Homer
+# SRDMRs Homer
 #----------------------------------------------------------------------------------------------------------------------
-HyperInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInAIS'), 'HyperInAIS')
-HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInMIA'), 'HyperInMIA')
-HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInIAC'), 'HyperInIAC')
-HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HypoInIAC'), 'HypoInIAC')
+HyperInAIS=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInAIS'), 'HyperInAIS', logP = TRUE)
+HyperInMIA=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInMIA'), 'HyperInMIA',logP = TRUE)
+HyperInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HyperInIAC'), 'HyperInIAC',logP = TRUE)
+HypoInIAC=homerKnownTFs(file.path(CONFIG$dataIntermediate, 'wgbs','homer.mask','HypoInIAC'), 'HypoInIAC',logP = TRUE)
 
 tfs<-do.call(rbind,list(HyperInAIS,HyperInMIA,HyperInIAC,HypoInIAC))
 srdmrTFs<-getSRTFS(tfs)
 saveRDS(srdmrTFs,file.path(CONFIG$dataIntermediate,'wgbs', 'srdmr.tfs.rds'))
+
+head(distinct(HyperInAIS, tf,.keep_all = TRUE),n=10)
+head(distinct(HyperInMIA, tf,.keep_all = TRUE),n=10)
+head(distinct(HyperInIAC, tf,.keep_all = TRUE),n=10)
+head(distinct(HypoInIAC, tf,.keep_all = TRUE),n=20)
 #----------------------------------------------------------------------------------------------------------------------
 # Figure S1B. SR-DMR Homer Figure. heatmap
 #----------------------------------------------------------------------------------------------------------------------

@@ -85,7 +85,7 @@ plotFeatureRCircos<-function(features){
 # Figure 7A. mapk deg
 #----------------------------------------------------------------------------------------------------------------------
 rnaTPM<-RnaTPM('RNA')
-saveImage2("rna.mapk.up.heatmap.pdf",width = 8,height = 4)
+saveImage2("rna.mapk.up.heatmap.pdf",width = 5,height = 4)
 mapkGenes<-list(
   rtk=c('EGFR','ERBB2','ERBB3','INSR','MET'),
   gf=c('EGF','FGF1','FGFBP1','TGFA'),
